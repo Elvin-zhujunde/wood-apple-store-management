@@ -107,6 +107,14 @@ router.put(
       pay_date, receipt_no, handler_finance,
     } = req.body;
 
+    // 日期归一：兼容 'YYYY-MM-DD' 与 ISO 'YYYY-MM-DDTHH:mm:ss.sssZ' 两种格式
+    // （订单详情返回的日期是 ISO，回传时 MySQL DATE 列严格模式会拒绝）
+    const normDate = (v) => {
+      if (!v) return null;
+      const s = String(v);
+      return s.length >= 10 ? s.slice(0, 10) : s;
+    };
+
     // 状态自动流转
     let status = '新建';
     if (pay_date && receipt_no) status = '已收款';
@@ -123,9 +131,9 @@ router.put(
         status=?
        WHERE id=?`,
       [customer, door_bom_id, color, qty, unit_price, total_amount,
-       expected_ship_date || null,
-       actual_ship_date || null, ship_no || null, handler_ship || null,
-       pay_date || null, receipt_no || null, handler_finance || null,
+       normDate(expected_ship_date),
+       normDate(actual_ship_date), ship_no || null, handler_ship || null,
+       normDate(pay_date), receipt_no || null, handler_finance || null,
        status, req.params.id]
     );
     ok(res, { status }, '更新成功');

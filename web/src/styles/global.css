@@ -4,3 +4,21 @@ html, body, #app { margin: 0; padding: 0; height: 100%; font-family: -apple-syst
 .toolbar { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .el-table .cell { font-size: 13px; }
 .muted { color: #909399; font-size: 12px; }
+
+/* ===== 移动端响应式（≤768px）===== */
+@media (max-width: 768px) {
+  /* 表格保持横向滚动，不强行压缩列 */
+  .el-table { width: 100%; }
+  .el-table .el-table__body-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* 工具栏输入/选择窄屏撑满 */
+  .toolbar .el-input, .toolbar .el-select { width: 100% !important; }
+  .toolbar { flex-wrap: wrap; }
+  .toolbar .el-button { min-height: 38px; }
+  /* 行内操作按钮触控放大 */
+  .el-table .el-button { min-height: 36px; padding: 0 10px; }
+  /* 弹窗窄屏接近满宽 */
+  .el-dialog { width: 92% !important; margin: 8vh auto !important; }
+  /* 分页居中、按钮放大 */
+  .el-pagination { justify-content: center; }
+  .el-pagination .el-pager li, .el-pagination button { min-width: 32px; min-height: 32px; }
+}

@@ -13,11 +13,11 @@
         <el-button type="primary" size="large" style="width:100%" :loading="loading" @click="onLogin">登 录</el-button>
       </el-form>
       <div class="accounts">
-        <p>测试账号（密码均 123456）：</p>
+        <p>任选账号登录，菜单全开（密码均 123456）：</p>
         <el-space wrap>
-          <el-button size="small" @click="quick('sale')">销售 sale</el-button>
-          <el-button size="small" @click="quick('stock')">库管 stock</el-button>
-          <el-button size="small" @click="quick('finance')">财务 finance</el-button>
+          <el-button size="small" @click="quick('sale')">sale</el-button>
+          <el-button size="small" @click="quick('stock')">stock</el-button>
+          <el-button size="small" @click="quick('finance')">finance</el-button>
         </el-space>
       </div>
     </el-card>

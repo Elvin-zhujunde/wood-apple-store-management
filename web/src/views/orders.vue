@@ -26,9 +26,12 @@
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">处理</el-button>
+          <el-button v-if="row.status === '新建'" link type="primary" class="row-btn" @click="openShip(row)">发货</el-button>
+          <el-button v-if="row.status === '已发货'" link type="success" class="row-btn" @click="openPay(row)">收款</el-button>
+          <el-button v-if="row.status === '已收款'" link disabled class="row-btn">已完成</el-button>
+          <el-button link type="primary" @click="openEdit(row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -41,7 +44,51 @@
       @current-change="load"
     />
 
-    <!-- 新增/编辑对话框 -->
+    <!-- 行内发货小弹窗 -->
+    <el-dialog v-model="shipVisible" title="发货回填" width="420px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        订单 <strong>{{ shipRow?.order_no }}</strong> · {{ shipRow?.customer }}
+      </el-alert>
+      <el-form :model="shipForm" label-width="100px">
+        <el-form-item label="实际发货日" required>
+          <el-date-picker v-model="shipForm.actual_ship_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="发货单号" required>
+          <el-input v-model="shipForm.ship_no" placeholder="物流运单号" />
+        </el-form-item>
+        <el-form-item label="发货经手人">
+          <el-input v-model="shipForm.handler_ship" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="shipVisible = false">取消</el-button>
+        <el-button type="primary" @click="onShip">确认发货</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 行内收款小弹窗 -->
+    <el-dialog v-model="payVisible" title="收款回填" width="420px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        订单 <strong>{{ payRow?.order_no }}</strong> · {{ payRow?.customer }}
+      </el-alert>
+      <el-form :model="payForm" label-width="100px">
+        <el-form-item label="收款日期" required>
+          <el-date-picker v-model="payForm.pay_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="收据单号" required>
+          <el-input v-model="payForm.receipt_no" />
+        </el-form-item>
+        <el-form-item label="收款经手人">
+          <el-input v-model="payForm.handler_finance" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="payVisible = false">取消</el-button>
+        <el-button type="primary" @click="onPay">确认收款</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 新增/编辑对话框（保留原完整表单） -->
     <el-dialog v-model="dlgVisible" :title="dlgTitle" width="760px" :close-on-click-modal="false">
       <el-tabs v-model="activeTab">
         <el-tab-pane label="订单信息" name="info">
@@ -117,11 +164,13 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { orderApi, bomApi } from '../api'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
 const store = useUserStore()
+const route = useRoute()
 const query = ref({ customer: '', status: '', page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
@@ -132,6 +181,14 @@ const dlgTitle = ref('')
 const isEdit = ref(false)
 const activeTab = ref('info')
 const form = ref({})
+
+// 行内发货/收款
+const shipVisible = ref(false)
+const shipRow = ref(null)
+const shipForm = ref({})
+const payVisible = ref(false)
+const payRow = ref(null)
+const payForm = ref({})
 
 const colorOptions = computed(() => {
   const bom = bomList.value.find((b) => b.id === form.value.door_bom_id)
@@ -146,6 +203,10 @@ function statusType(s) {
   return { 新建: 'info', 已发货: 'warning', 已收款: 'success' }[s] || 'info'
 }
 
+function today() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 async function load() {
   const res = await orderApi.list(query.value)
   list.value = res.data.list
@@ -158,7 +219,7 @@ function openAdd() {
   activeTab.value = 'info'
   form.value = {
     customer: '', door_bom_id: '', color: '', qty: 1, unit_price: 0,
-    handler_sale: store.name, order_date: new Date().toISOString().slice(0, 10),
+    handler_sale: store.name, order_date: today(),
     expected_ship_date: '',
   }
   dlgVisible.value = true
@@ -198,8 +259,72 @@ async function onSubmit() {
   load()
 }
 
+// 行内发货：只填关键字段，其余从订单详情带出，经手人默认当前登录人
+function openShip(row) {
+  shipRow.value = row
+  shipForm.value = {
+    actual_ship_date: today(),
+    ship_no: '',
+    handler_ship: store.name,
+  }
+  shipVisible.value = true
+}
+
+async function onShip() {
+  const f = shipForm.value
+  if (!f.actual_ship_date || !f.ship_no) return ElMessage.warning('请填发货日与发货单号')
+  const r = shipRow.value
+  // 复用 PUT，带上订单原有字段 + 发货字段，触发状态流转
+  await orderApi.update(r.id, {
+    customer: r.customer, door_bom_id: r.door_bom_id, color: r.color,
+    qty: r.qty, unit_price: r.unit_price, expected_ship_date: r.expected_ship_date,
+    actual_ship_date: f.actual_ship_date, ship_no: f.ship_no, handler_ship: f.handler_ship,
+    pay_date: null, receipt_no: null, handler_finance: null,
+  })
+  ElMessage.success('已发货，状态已更新')
+  shipVisible.value = false
+  load()
+}
+
+// 行内收款
+function openPay(row) {
+  payRow.value = row
+  payForm.value = {
+    pay_date: today(),
+    receipt_no: '',
+    handler_finance: store.name,
+  }
+  payVisible.value = true
+}
+
+async function onPay() {
+  const f = payForm.value
+  if (!f.pay_date || !f.receipt_no) return ElMessage.warning('请填收款日与收据单号')
+  const r = payRow.value
+  await orderApi.update(r.id, {
+    customer: r.customer, door_bom_id: r.door_bom_id, color: r.color,
+    qty: r.qty, unit_price: r.unit_price, expected_ship_date: r.expected_ship_date,
+    actual_ship_date: r.actual_ship_date, ship_no: r.ship_no, handler_ship: r.handler_ship,
+    pay_date: f.pay_date, receipt_no: f.receipt_no, handler_finance: f.handler_finance,
+  })
+  ElMessage.success('已收款，状态已更新')
+  payVisible.value = false
+  load()
+}
+
 onMounted(async () => {
   bomList.value = (await bomApi.all()).data
+  // 工作台待办跳转带 status query，自动筛选
+  if (route.query.status) {
+    query.value.status = String(route.query.status)
+  }
   load()
 })
 </script>
+
+<style scoped>
+/* 移动端：行内操作按钮放大到手指好点 */
+@media (max-width: 768px) {
+  .row-btn { min-height: 44px; padding: 0 12px; }
+}
+</style>
