@@ -26,14 +26,25 @@
     <el-pagination v-model:current-page="query.page" :page-size="query.pageSize" :total="total" layout="total, prev, pager, next" style="margin-top:12px" @current-change="load" />
 
     <el-dialog v-model="dlgVisible" :title="isEdit ? '编辑物料' : '新增物料'" width="560px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        <strong>物料录入规格</strong>：一物一档，同物不拆分；规格取标准值（板材写 长*宽*厚，如 2440*1220*4.0）；单位从标准列表选。费用/资产/加工费不录入物料档案。
+      </el-alert>
       <el-form :model="form" label-width="100px">
         <el-form-item label="物料编码" required><el-input v-model="form.code" :disabled="isEdit" placeholder="如 CL-008" /></el-form-item>
-        <el-form-item label="物料名称" required><el-input v-model="form.name" /></el-form-item>
+        <el-form-item label="物料名称" required><el-input v-model="form.name" placeholder="如 碳素面板" /></el-form-item>
         <el-form-item label="分类" required>
           <el-radio-group v-model="form.category"><el-radio value="主材">主材</el-radio><el-radio value="耗材">耗材</el-radio></el-radio-group>
         </el-form-item>
-        <el-form-item label="规格型号" required><el-input v-model="form.spec" placeholder="如 9mm 1220x2440mm" /></el-form-item>
-        <el-form-item label="计量单位" required><el-input v-model="form.unit" placeholder="如 张/米/公斤" /></el-form-item>
+        <el-form-item label="规格型号" required>
+          <el-input v-model="form.spec" placeholder="板材:2440*1220*4.0 / 线条:5.8*1.2*2200 / 锁具:T035" />
+          <div class="muted">板材写 长*宽*厚(mm)，线条写 宽*厚*长(mm)，五金写型号</div>
+        </el-form-item>
+        <el-form-item label="计量单位" required>
+          <el-select v-model="form.unit" filterable allow-create placeholder="选择标准单位" style="width:100%">
+            <el-option v-for="u in UNIT_OPTIONS" :key="u" :label="u" :value="u" />
+          </el-select>
+          <div class="muted">板材:张 线条:支/米 五金:把/套 胶:桶</div>
+        </el-form-item>
         <el-form-item label="安全库存"><el-input-number v-model="form.safety_stock" :min="0" :precision="3" style="width:100%" /></el-form-item>
       </el-form>
       <template #footer>
@@ -55,6 +66,9 @@ const total = ref(0)
 const dlgVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({})
+
+// 标准计量单位（业务规格约束：一物一档，单位统一从标准列表选）
+const UNIT_OPTIONS = ['张', '支', '米', '把', '套', '个', '桶', '卷', '条', '件', '袋', '公斤']
 
 async function load() {
   const res = await materialApi.list(query.value)
