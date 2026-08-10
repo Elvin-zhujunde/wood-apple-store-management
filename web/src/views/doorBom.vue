@@ -48,6 +48,9 @@
             <template #default="{ $index }"><el-button link type="danger" @click="form.items.splice($index,1)">删除</el-button></template>
           </el-table-column>
         </el-table>
+        <el-form-item v-if="isEdit" label="门型样图" style="margin-top:12px">
+          <ImageUpload v-model="imgList" entity-type="bom" :entity-id="form.id" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dlgVisible = false">取消</el-button>
@@ -59,8 +62,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { bomApi, materialApi } from '../api'
+import { bomApi, materialApi, attachmentApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ImageUpload from '../components/ImageUpload.vue'
 
 const keyword = ref('')
 const list = ref([])
@@ -68,6 +72,7 @@ const mats = ref([])
 const dlgVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({})
+const imgList = ref([])
 
 async function load() {
   const res = await bomApi.list({ keyword: keyword.value })
@@ -89,6 +94,11 @@ async function openEdit(row) {
     nonstd_markup: Number(res.data.nonstd_markup),
     items: res.data.items.map((it) => ({ id: it.id, material_id: it.material_id, unit_usage: Number(it.unit_usage), loss_rate: Number(it.loss_rate) })),
   }
+  imgList.value = []
+  try {
+    const r = await attachmentApi.list('bom', row.id)
+    imgList.value = r.data
+  } catch (e) {}
   dlgVisible.value = true
 }
 

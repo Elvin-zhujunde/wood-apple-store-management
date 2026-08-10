@@ -165,6 +165,21 @@ CREATE TABLE purchase_suggestion (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购建议';
 
 -- ============================================================
+-- 10. 业务图片附件表（独立泛化关联，DB只存相对路径，前缀前端拼）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS attachments (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  entity_type VARCHAR(20)  NOT NULL COMMENT '业务实体: order/inbound/material/bom/requisition',
+  entity_id   INT          NOT NULL COMMENT '业务实体id',
+  file_path   VARCHAR(255) NOT NULL COMMENT '相对路径 uploads/2026-08/xxx.jpg',
+  file_name   VARCHAR(100) NOT NULL COMMENT '原始文件名',
+  file_size   INT          DEFAULT 0 COMMENT '字节',
+  uploaded_by VARCHAR(50)  COMMENT '上传人',
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_entity (entity_type, entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务图片附件';
+
+-- ============================================================
 -- 种子数据:门型BOM(2026年木果订单 Excel 实际门型code)
 -- MG=厂做木门 YX=永旭系列 FS=福顺系列(Excel历史订单仅此三种门型)
 -- ============================================================

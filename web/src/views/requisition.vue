@@ -20,6 +20,11 @@
       <el-table-column prop="qty" label="领用数量" width="100" align="right" />
       <el-table-column prop="req_date" label="领用日期" width="120" :formatter="dateFmt" />
       <el-table-column prop="handler" label="经手人" width="90" />
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click="openImages(row)">图片</el-button>
+        </template>
+      </el-table-column>
     </el-table>
     <el-pagination
       v-model:current-page="query.page"
@@ -52,15 +57,21 @@
         <el-button type="primary" @click="onAdd">确认领料</el-button>
       </template>
     </el-dialog>
+
+    <!-- 图片管理（领料单照片，非必填） -->
+    <el-dialog v-model="imgVisible" :title="`领料单图片 · ${curImgNo}`" width="560px">
+      <ImageUpload v-model="imgList" entity-type="requisition" :entity-id="curImgId" />
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { requisitionApi, materialApi, orderApi } from '../api'
+import { requisitionApi, materialApi, orderApi, attachmentApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
+import ImageUpload from '../components/ImageUpload.vue'
 
 const store = useUserStore()
 const query = ref({ order_no: '', material_id: '', handler: '', dateRange: [], page: 1, pageSize: 20 })
@@ -71,6 +82,10 @@ const orderOptions = ref([])
 const orderLoading = ref(false)
 const addVisible = ref(false)
 const form = ref({})
+const imgVisible = ref(false)
+const curImgId = ref(null)
+const curImgNo = ref('')
+const imgList = ref([])
 
 const curStock = computed(() => {
   const m = mats.value.find((x) => x.id === form.value.material_id)
@@ -126,6 +141,17 @@ async function onAdd() {
   addVisible.value = false
   mats.value = (await materialApi.all()).data
   load()
+}
+
+async function openImages(row) {
+  curImgId.value = row.id
+  curImgNo.value = row.req_no
+  imgList.value = []
+  if (row.id) {
+    const res = await attachmentApi.list('requisition', row.id)
+    imgList.value = res.data
+  }
+  imgVisible.value = true
 }
 
 onMounted(async () => {

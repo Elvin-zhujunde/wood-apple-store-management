@@ -46,6 +46,9 @@
           <div class="muted">板材:张 线条:支/米 五金:把/套 胶:桶</div>
         </el-form-item>
         <el-form-item label="安全库存"><el-input-number v-model="form.safety_stock" :min="0" :precision="3" style="width:100%" /></el-form-item>
+        <el-form-item v-if="isEdit" label="物料图片">
+          <ImageUpload v-model="imgList" entity-type="material" :entity-id="form.id" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dlgVisible = false">取消</el-button>
@@ -57,8 +60,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { materialApi } from '../api'
+import { materialApi, attachmentApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ImageUpload from '../components/ImageUpload.vue'
 
 const query = ref({ category: '', keyword: '', page: 1, pageSize: 20 })
 const list = ref([])
@@ -66,6 +70,7 @@ const total = ref(0)
 const dlgVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({})
+const imgList = ref([])
 
 // 标准计量单位（业务规格约束：一物一档，单位统一从标准列表选）
 const UNIT_OPTIONS = ['张', '支', '米', '把', '套', '个', '桶', '卷', '条', '件', '袋', '公斤']
@@ -82,9 +87,14 @@ function openAdd() {
   dlgVisible.value = true
 }
 
-function openEdit(row) {
+async function openEdit(row) {
   isEdit.value = true
   form.value = { ...row }
+  imgList.value = []
+  try {
+    const r = await attachmentApi.list('material', row.id)
+    imgList.value = r.data
+  } catch (e) {}
   dlgVisible.value = true
 }
 

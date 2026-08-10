@@ -159,6 +159,11 @@
             <el-form-item label="收款经手人"><el-input v-model="form.handler_finance" /></el-form-item>
           </el-form>
         </el-tab-pane>
+
+        <el-tab-pane v-if="isEdit" label="图片附件" name="images">
+          <el-alert type="info" :closable="false" style="margin-bottom:12px">可上传客户确认图、合同、发货实拍等。图片非必填。</el-alert>
+          <ImageUpload v-model="imgList" entity-type="order" :entity-id="form.id" />
+        </el-tab-pane>
       </el-tabs>
 
       <template #footer>
@@ -172,10 +177,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { orderApi, bomApi } from '../api'
+import { orderApi, bomApi, attachmentApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
+import ImageUpload from '../components/ImageUpload.vue'
 
 const store = useUserStore()
 const route = useRoute()
@@ -189,6 +195,7 @@ const dlgTitle = ref('')
 const isEdit = ref(false)
 const activeTab = ref('info')
 const form = ref({})
+const imgList = ref([])
 
 // 行内发货/收款
 const shipVisible = ref(false)
@@ -251,6 +258,12 @@ async function openEdit(row) {
   activeTab.value = 'info'
   const res = await orderApi.detail(row.id)
   form.value = { ...res.data }
+  // 加载已有图片
+  imgList.value = []
+  try {
+    const r = await attachmentApi.list('order', row.id)
+    imgList.value = r.data
+  } catch (e) {}
   dlgVisible.value = true
 }
 

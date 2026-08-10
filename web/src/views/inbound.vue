@@ -32,9 +32,10 @@
           <el-tag :type="row.status === '已到货' ? 'success' : 'warning'" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === '待到货'" link type="primary" @click="openConfirm(row)">确认到货</el-button>
+          <el-button link type="primary" @click="openImages(row)">图片</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -85,15 +86,22 @@
         <el-button type="primary" @click="onConfirm">确认到货</el-button>
       </template>
     </el-dialog>
+
+    <!-- 图片管理（采购留痕：进货票据/到货实拍/运费票） -->
+    <el-dialog v-model="imgVisible" :title="`采购入库图片 · ${curImgNo}`" width="560px">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">采购留痕：可上传进货票据、到货实拍、运费票等。图片非必填。</el-alert>
+      <ImageUpload v-model="imgList" entity-type="inbound" :entity-id="curImgId" />
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { inboundApi, materialApi } from '../api'
+import { inboundApi, materialApi, attachmentApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
+import ImageUpload from '../components/ImageUpload.vue'
 
 const store = useUserStore()
 const query = ref({ inbound_no: '', material_id: '', supplier: '', handler: '', status: '', dateRange: [], page: 1, pageSize: 20 })
@@ -105,6 +113,10 @@ const confirmVisible = ref(false)
 const confirmId = ref(null)
 const confirmDate = ref('')
 const form = ref({})
+const imgVisible = ref(false)
+const curImgId = ref(null)
+const curImgNo = ref('')
+const imgList = ref([])
 
 const curSpec = computed(() => {
   const m = mats.value.find((x) => x.id === form.value.material_id)
@@ -160,6 +172,17 @@ async function onConfirm() {
   ElMessage.success('已确认到货，库存已增加')
   confirmVisible.value = false
   load()
+}
+
+async function openImages(row) {
+  curImgId.value = row.id
+  curImgNo.value = row.inbound_no
+  imgList.value = []
+  if (row.id) {
+    const res = await attachmentApi.list('inbound', row.id)
+    imgList.value = res.data
+  }
+  imgVisible.value = true
 }
 
 onMounted(async () => {

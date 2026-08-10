@@ -1,11 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 静态图片访问（无需登录，内网环境）
+// TODO 若以后开放外网，需在此加 token 校验中间件
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // 健康检查
 app.get('/', (req, res) => res.json({ code: 0, msg: 'wood-store server running', data: null }));
@@ -19,6 +24,7 @@ app.use('/api/purchase-inbound', require('./routes/purchaseInbound'));
 app.use('/api/requisition', require('./routes/requisition'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/purchase-suggestion', require('./routes/purchaseSuggestion'));
+app.use('/api/attachments', require('./routes/attachments'));
 
 // 404
 app.use((req, res) => res.status(404).json({ code: 404, msg: '接口不存在', data: null }));
