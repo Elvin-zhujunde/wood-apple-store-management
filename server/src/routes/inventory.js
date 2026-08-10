@@ -34,17 +34,26 @@ router.get(
   })
 );
 
-// 物料库存详情（含变动流水）
+// 物料库存详情（含变动流水，支持检索+分页）
 router.get(
   '/:id',
   wrap(async (req, res) => {
+    const { change_type, ref_no, startDate, endDate, page = 1, pageSize = 20 } = req.query;
     const [mats] = await pool.query('SELECT * FROM materials WHERE id = ?', [req.params.id]);
     if (mats.length === 0) return fail(res, '物料不存在');
+    const where = ['material_id = ?'];
+    const params = [req.params.id];
+    if (change_type) { where.push('change_type = ?'); params.push(change_type); }
+    if (ref_no) { where.push('ref_no LIKE ?'); params.push(`%${ref_no}%`); }
+    if (startDate) { where.push('created_at >= ?'); params.push(startDate); }
+    if (endDate) { where.push('created_at < DATE_ADD(?, INTERVAL 1 DAY)'); params.push(endDate); }
+    const clause = 'WHERE ' + where.join(' AND ');
+    const total = (await pool.query(`SELECT COUNT(*) c FROM inventory_log ${clause}`, params))[0][0].c;
     const [logs] = await pool.query(
-      'SELECT * FROM inventory_log WHERE material_id = ? ORDER BY id DESC LIMIT 100',
-      [req.params.id]
+      `SELECT * FROM inventory_log ${clause} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, Number(pageSize), (Number(page) - 1) * Number(pageSize)]
     );
-    ok(res, { ...mats[0], logs });
+    ok(res, { ...mats[0], logs, log_total: total, page: Number(page), pageSize: Number(pageSize) });
   })
 );
 

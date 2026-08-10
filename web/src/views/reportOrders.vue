@@ -16,12 +16,12 @@
       <el-table-column prop="qty" label="数量" width="60" align="right" />
       <el-table-column prop="total_amount" label="金额" width="90" align="right" />
       <el-table-column prop="handler_sale" label="销售经手" width="80" />
-      <el-table-column prop="order_date" label="下单日" width="100" />
-      <el-table-column prop="expected_ship_date" label="约定发货" width="100" />
-      <el-table-column prop="actual_ship_date" label="实际发货" width="100" />
+      <el-table-column prop="order_date" label="下单日" width="120" />
+      <el-table-column prop="expected_ship_date" label="约定发货" width="120" />
+      <el-table-column prop="actual_ship_date" label="实际发货" width="120" />
       <el-table-column prop="ship_no" label="发货单号" width="120" />
       <el-table-column prop="handler_ship" label="发货经手" width="80" />
-      <el-table-column prop="pay_date" label="收款日" width="100" />
+      <el-table-column prop="pay_date" label="收款日" width="120" />
       <el-table-column prop="receipt_no" label="收据号" width="100" />
       <el-table-column prop="handler_finance" label="收款经手" width="80" />
       <el-table-column label="状态" width="80" fixed="right">

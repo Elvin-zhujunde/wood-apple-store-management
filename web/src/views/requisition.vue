@@ -33,8 +33,8 @@
     <el-dialog v-model="addVisible" title="生产领料" width="560px" :close-on-click-modal="false">
       <el-form :model="form" label-width="100px">
         <el-form-item label="关联订单" required>
-          <el-select v-model="form.order_id" filterable style="width:100%">
-            <el-option v-for="o in orders" :key="o.id" :label="`${o.order_no} (${o.customer})`" :value="o.id" />
+          <el-select v-model="form.order_id" filterable remote :remote-method="searchOrder" :loading="orderLoading" placeholder="输入订单号/客户搜索" style="width:100%">
+            <el-option v-for="o in orderOptions" :key="o.id" :label="`${o.order_no} (${o.customer})`" :value="o.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="物料" required>
@@ -66,7 +66,8 @@ const query = ref({ order_no: '', material_id: '', handler: '', dateRange: [], p
 const list = ref([])
 const total = ref(0)
 const mats = ref([])
-const orders = ref([])
+const orderOptions = ref([])
+const orderLoading = ref(false)
 const addVisible = ref(false)
 const form = ref({})
 
@@ -99,7 +100,20 @@ function openAdd() {
     order_id: '', material_id: '', qty: 0,
     req_date: new Date().toISOString().slice(0, 10), handler: store.name,
   }
+  orderOptions.value = []
   addVisible.value = true
+}
+
+// 远程搜索订单（避免全量加载3213条卡顿）
+async function searchOrder(q) {
+  if (!q) { orderOptions.value = []; return }
+  orderLoading.value = true
+  try {
+    const res = await orderApi.list({ keyword: q, pageSize: 20 })
+    orderOptions.value = res.data.list
+  } finally {
+    orderLoading.value = false
+  }
 }
 
 async function onAdd() {
@@ -115,7 +129,6 @@ async function onAdd() {
 
 onMounted(async () => {
   mats.value = (await materialApi.all()).data
-  orders.value = (await orderApi.list({ pageSize: 999 })).data.list
   load()
 })
 </script>

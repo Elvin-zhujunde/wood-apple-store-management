@@ -51,7 +51,7 @@ export const requisitionApi = {
 // 库存
 export const inventoryApi = {
   list: (params) => request.get('/inventory', { params }),
-  detail: (id) => request.get('/inventory/' + id),
+  detail: (id, params) => request.get('/inventory/' + id, { params }),
 }
 
 // 采购建议
