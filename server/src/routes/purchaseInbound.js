@@ -10,12 +10,14 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { status, material_id, supplier, startDate, endDate, page = 1, pageSize = 20 } = req.query;
+    const { status, material_id, supplier, inbound_no, handler, startDate, endDate, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (status) { where.push('pi.status = ?'); params.push(status); }
     if (material_id) { where.push('pi.material_id = ?'); params.push(material_id); }
     if (supplier) { where.push('pi.supplier LIKE ?'); params.push(`%${supplier}%`); }
+    if (inbound_no) { where.push('pi.inbound_no LIKE ?'); params.push(`%${inbound_no}%`); }
+    if (handler) { where.push('pi.handler LIKE ?'); params.push(`%${handler}%`); }
     if (startDate) { where.push('pi.purchase_date >= ?'); params.push(startDate); }
     if (endDate) { where.push('pi.purchase_date <= ?'); params.push(endDate); }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';

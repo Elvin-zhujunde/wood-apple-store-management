@@ -11,15 +11,17 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { status, priority, order_id, page = 1, pageSize = 20 } = req.query;
+    const { status, priority, order_id, customer, material_name, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (status) { where.push('ps.status = ?'); params.push(status); }
     if (priority) { where.push('ps.priority = ?'); params.push(priority); }
     if (order_id) { where.push('ps.order_id = ?'); params.push(order_id); }
+    if (customer) { where.push('so.customer LIKE ?'); params.push(`%${customer}%`); }
+    if (material_name) { where.push('m.name LIKE ?'); params.push(`%${material_name}%`); }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const total = (
-      await pool.query(`SELECT COUNT(*) c FROM purchase_suggestion ps ${clause}`, params)
+      await pool.query(`SELECT COUNT(*) c FROM purchase_suggestion ps JOIN materials m ON m.id = ps.material_id JOIN sales_orders so ON so.id = ps.order_id ${clause}`, params)
     )[0][0].c;
     const rows = (
       await pool.query(

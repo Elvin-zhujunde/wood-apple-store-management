@@ -11,7 +11,7 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { status, customer, startDate, endDate, page = 1, pageSize = 20 } = req.query;
+    const { status, customer, order_no, door_bom_id, handler_sale, startDate, endDate, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (status) {
@@ -21,6 +21,18 @@ router.get(
     if (customer) {
       where.push('so.customer LIKE ?');
       params.push(`%${customer}%`);
+    }
+    if (order_no) {
+      where.push('so.order_no LIKE ?');
+      params.push(`%${order_no}%`);
+    }
+    if (door_bom_id) {
+      where.push('so.door_bom_id = ?');
+      params.push(Number(door_bom_id));
+    }
+    if (handler_sale) {
+      where.push('so.handler_sale LIKE ?');
+      params.push(`%${handler_sale}%`);
     }
     if (startDate) {
       where.push('so.order_date >= ?');

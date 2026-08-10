@@ -1,13 +1,20 @@
 <template>
   <el-card shadow="never">
     <div class="toolbar">
-      <el-input v-model="query.customer" placeholder="客户名称" clearable style="width:180px" @change="load" />
-      <el-select v-model="query.status" placeholder="状态" clearable style="width:120px" @change="load">
+      <el-input v-model="query.order_no" placeholder="订单号" clearable style="width:150px" @change="load" />
+      <el-input v-model="query.customer" placeholder="客户名称" clearable style="width:160px" @change="load" />
+      <el-select v-model="query.door_bom_id" placeholder="门型" clearable style="width:140px" @change="load">
+        <el-option v-for="b in bomList" :key="b.id" :label="`${b.code} ${b.name}`" :value="b.id" />
+      </el-select>
+      <el-input v-model="query.handler_sale" placeholder="经手人" clearable style="width:110px" @change="load" />
+      <el-select v-model="query.status" placeholder="状态" clearable style="width:110px" @change="load">
         <el-option label="新建" value="新建" />
         <el-option label="已发货" value="已发货" />
         <el-option label="已收款" value="已收款" />
       </el-select>
+      <el-date-picker v-model="query.dateRange" type="daterange" range-separator="至" start-placeholder="下单开始" end-placeholder="下单结束" value-format="YYYY-MM-DD" style="width:240px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
+      <el-button @click="resetQuery">重置</el-button>
       <el-button type="success" @click="openAdd">+ 接单</el-button>
     </div>
     <el-table :data="list" stripe border>
@@ -18,9 +25,9 @@
       <el-table-column prop="qty" label="数量(樘)" width="90" align="right" />
       <el-table-column prop="total_amount" label="总金额" width="100" align="right" />
       <el-table-column prop="handler_sale" label="经手人" width="80" />
-      <el-table-column prop="order_date" label="下单日" width="110" />
-      <el-table-column prop="actual_ship_date" label="发货日" width="110" />
-      <el-table-column prop="pay_date" label="收款日" width="110" />
+      <el-table-column prop="order_date" label="下单日" width="120" />
+      <el-table-column prop="actual_ship_date" label="发货日" width="120" />
+      <el-table-column prop="pay_date" label="收款日" width="120" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
@@ -171,7 +178,7 @@ import { useUserStore } from '../store/user'
 
 const store = useUserStore()
 const route = useRoute()
-const query = ref({ customer: '', status: '', page: 1, pageSize: 20 })
+const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
@@ -208,9 +215,21 @@ function today() {
 }
 
 async function load() {
-  const res = await orderApi.list(query.value)
+  const params = { ...query.value }
+  if (params.dateRange && params.dateRange.length === 2) {
+    params.startDate = params.dateRange[0]
+    params.endDate = params.dateRange[1]
+  }
+  delete params.dateRange
+  const res = await orderApi.list(params)
   list.value = res.data.list
   total.value = res.data.total
+}
+
+function resetQuery() {
+  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 20 }
+  if (route.query.status) query.value.status = String(route.query.status)
+  load()
 }
 
 function openAdd() {

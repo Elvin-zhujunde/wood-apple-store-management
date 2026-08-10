@@ -1,15 +1,18 @@
 <template>
   <el-card shadow="never">
     <div class="toolbar">
-      <el-select v-model="query.status" placeholder="状态" clearable style="width:130px" @change="load">
+      <el-select v-model="query.status" placeholder="状态" clearable style="width:120px" @change="load">
         <el-option label="待采购" value="待采购" />
         <el-option label="已采购" value="已采购" />
       </el-select>
-      <el-select v-model="query.priority" placeholder="优先级" clearable style="width:130px" @change="load">
+      <el-select v-model="query.priority" placeholder="优先级" clearable style="width:120px" @change="load">
         <el-option label="紧急" value="紧急" />
         <el-option label="常规" value="常规" />
       </el-select>
+      <el-input v-model="query.customer" placeholder="客户名称" clearable style="width:150px" @change="load" />
+      <el-input v-model="query.material_name" placeholder="物料名称" clearable style="width:140px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
+      <el-button @click="resetQuery">重置</el-button>
     </div>
     <el-alert type="warning" :closable="false" style="margin-bottom:12px">
       系统在<strong>销售订单保存时自动按 BOM 拆解</strong>物料需求并对比库存生成采购建议。点【采纳】可一键生成待到货采购入库单，到货确认后库存自动增加。
@@ -96,7 +99,7 @@ import { useUserStore } from '../store/user'
 
 const router = useRouter()
 const store = useUserStore()
-const query = ref({ status: '待采购', priority: '', page: 1, pageSize: 20 })
+const query = ref({ status: '待采购', priority: '', customer: '', material_name: '', page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
 
@@ -108,6 +111,11 @@ async function load() {
   const res = await suggestionApi.list(query.value)
   list.value = res.data.list
   total.value = res.data.total
+}
+
+function resetQuery() {
+  query.value = { status: '待采购', priority: '', customer: '', material_name: '', page: 1, pageSize: 20 }
+  load()
 }
 
 function openAdopt(row) {

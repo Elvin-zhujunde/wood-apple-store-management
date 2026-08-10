@@ -1,8 +1,15 @@
 <template>
   <el-card shadow="never">
     <div class="toolbar">
+      <el-input v-model="query.order_no" placeholder="关联订单号" clearable style="width:150px" @change="load" />
+      <el-select v-model="query.material_id" placeholder="物料" clearable filterable style="width:160px" @change="load">
+        <el-option v-for="m in mats" :key="m.id" :label="`${m.code} ${m.name}`" :value="m.id" />
+      </el-select>
+      <el-input v-model="query.handler" placeholder="经手人" clearable style="width:110px" @change="load" />
+      <el-date-picker v-model="query.dateRange" type="daterange" range-separator="至" start-placeholder="领用开始" end-placeholder="领用结束" value-format="YYYY-MM-DD" style="width:240px" @change="load" />
+      <el-button type="primary" @click="load">查询</el-button>
+      <el-button @click="resetQuery">重置</el-button>
       <el-button type="success" @click="openAdd">+ 领料</el-button>
-      <el-button type="primary" @click="load">刷新</el-button>
     </div>
     <el-table :data="list" stripe border>
       <el-table-column prop="req_no" label="领料单号" width="160" />
@@ -11,7 +18,7 @@
       <el-table-column prop="material_name" label="物料" width="110" />
       <el-table-column prop="spec" label="规格" min-width="140" />
       <el-table-column prop="qty" label="领用数量" width="100" align="right" />
-      <el-table-column prop="req_date" label="领用日期" width="110" />
+      <el-table-column prop="req_date" label="领用日期" width="120" />
       <el-table-column prop="handler" label="经手人" width="90" />
     </el-table>
     <el-pagination
@@ -55,7 +62,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
 const store = useUserStore()
-const query = ref({ page: 1, pageSize: 20 })
+const query = ref({ order_no: '', material_id: '', handler: '', dateRange: [], page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
 const mats = ref([])
@@ -69,9 +76,20 @@ const curStock = computed(() => {
 })
 
 async function load() {
-  const res = await requisitionApi.list(query.value)
+  const params = { ...query.value }
+  if (params.dateRange && params.dateRange.length === 2) {
+    params.startDate = params.dateRange[0]
+    params.endDate = params.dateRange[1]
+  }
+  delete params.dateRange
+  const res = await requisitionApi.list(params)
   list.value = res.data.list
   total.value = res.data.total
+}
+
+function resetQuery() {
+  query.value = { order_no: '', material_id: '', handler: '', dateRange: [], page: 1, pageSize: 20 }
+  load()
 }
 
 function onMaterial() {}

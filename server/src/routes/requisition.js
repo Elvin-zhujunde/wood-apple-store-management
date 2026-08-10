@@ -10,15 +10,17 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { order_id, material_id, startDate, endDate, page = 1, pageSize = 20 } = req.query;
+    const { order_id, material_id, order_no, handler, startDate, endDate, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (order_id) { where.push('mr.order_id = ?'); params.push(order_id); }
     if (material_id) { where.push('mr.material_id = ?'); params.push(material_id); }
+    if (order_no) { where.push('so.order_no LIKE ?'); params.push(`%${order_no}%`); }
+    if (handler) { where.push('mr.handler LIKE ?'); params.push(`%${handler}%`); }
     if (startDate) { where.push('mr.req_date >= ?'); params.push(startDate); }
     if (endDate) { where.push('mr.req_date <= ?'); params.push(endDate); }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const total = (await pool.query(`SELECT COUNT(*) c FROM material_requisition mr ${clause}`, params))[0][0].c;
+    const total = (await pool.query(`SELECT COUNT(*) c FROM material_requisition mr JOIN sales_orders so ON so.id = mr.order_id ${clause}`, params))[0][0].c;
     const rows = (
       await pool.query(
         `SELECT mr.*, m.name AS material_name, m.code, m.spec, m.unit,

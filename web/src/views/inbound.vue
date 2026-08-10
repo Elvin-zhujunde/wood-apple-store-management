@@ -1,12 +1,19 @@
 <template>
   <el-card shadow="never">
     <div class="toolbar">
-      <el-input v-model="query.supplier" placeholder="厂家" clearable style="width:160px" @change="load" />
-      <el-select v-model="query.status" placeholder="状态" clearable style="width:120px" @change="load">
+      <el-input v-model="query.inbound_no" placeholder="入库单号" clearable style="width:150px" @change="load" />
+      <el-select v-model="query.material_id" placeholder="物料" clearable filterable style="width:160px" @change="load">
+        <el-option v-for="m in mats" :key="m.id" :label="`${m.code} ${m.name}`" :value="m.id" />
+      </el-select>
+      <el-input v-model="query.supplier" placeholder="厂家" clearable style="width:140px" @change="load" />
+      <el-input v-model="query.handler" placeholder="经手人" clearable style="width:110px" @change="load" />
+      <el-select v-model="query.status" placeholder="状态" clearable style="width:110px" @change="load">
         <el-option label="待到货" value="待到货" />
         <el-option label="已到货" value="已到货" />
       </el-select>
+      <el-date-picker v-model="query.dateRange" type="daterange" range-separator="至" start-placeholder="进货开始" end-placeholder="进货结束" value-format="YYYY-MM-DD" style="width:240px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
+      <el-button @click="resetQuery">重置</el-button>
       <el-button type="success" @click="openAdd">+ 入库单</el-button>
     </div>
     <el-table :data="list" stripe border>
@@ -17,8 +24,8 @@
       <el-table-column prop="qty" label="数量" width="80" align="right" />
       <el-table-column prop="unit_price" label="进价" width="80" align="right" />
       <el-table-column prop="freight" label="物流费" width="90" align="right" />
-      <el-table-column prop="purchase_date" label="进货日" width="100" />
-      <el-table-column prop="actual_arrival" label="到货日" width="100" />
+      <el-table-column prop="purchase_date" label="进货日" width="120" />
+      <el-table-column prop="actual_arrival" label="到货日" width="120" />
       <el-table-column prop="handler" label="经手人" width="80" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
@@ -88,7 +95,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
 const store = useUserStore()
-const query = ref({ supplier: '', status: '', page: 1, pageSize: 20 })
+const query = ref({ inbound_no: '', material_id: '', supplier: '', handler: '', status: '', dateRange: [], page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
 const mats = ref([])
@@ -104,9 +111,20 @@ const curSpec = computed(() => {
 })
 
 async function load() {
-  const res = await inboundApi.list(query.value)
+  const params = { ...query.value }
+  if (params.dateRange && params.dateRange.length === 2) {
+    params.startDate = params.dateRange[0]
+    params.endDate = params.dateRange[1]
+  }
+  delete params.dateRange
+  const res = await inboundApi.list(params)
   list.value = res.data.list
   total.value = res.data.total
+}
+
+function resetQuery() {
+  query.value = { inbound_no: '', material_id: '', supplier: '', handler: '', status: '', dateRange: [], page: 1, pageSize: 20 }
+  load()
 }
 
 function onMaterial() {}
