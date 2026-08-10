@@ -24,8 +24,8 @@
       <el-table-column prop="qty" label="数量" width="80" align="right" />
       <el-table-column prop="unit_price" label="进价" width="80" align="right" />
       <el-table-column prop="freight" label="物流费" width="90" align="right" />
-      <el-table-column prop="purchase_date" label="进货日" width="120" />
-      <el-table-column prop="actual_arrival" label="到货日" width="120" />
+      <el-table-column prop="purchase_date" label="进货日" width="120" :formatter="dateFmt" />
+      <el-table-column prop="actual_arrival" label="到货日" width="120" :formatter="dateFmt" />
       <el-table-column prop="handler" label="经手人" width="80" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
@@ -91,6 +91,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { inboundApi, materialApi } from '../api'
+import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
@@ -132,7 +133,7 @@ function onMaterial() {}
 function openAdd() {
   form.value = {
     material_id: '', supplier: '', qty: 0, unit_price: 0, freight: 0,
-    purchase_date: new Date().toISOString().slice(0, 10), expected_arrival: '', handler: store.name,
+    purchase_date: todayLocal(), expected_arrival: '', handler: store.name,
   }
   addVisible.value = true
 }
@@ -149,7 +150,7 @@ async function onAdd() {
 
 function openConfirm(row) {
   confirmId.value = row.id
-  confirmDate.value = new Date().toISOString().slice(0, 10)
+  confirmDate.value = todayLocal()
   confirmVisible.value = true
 }
 

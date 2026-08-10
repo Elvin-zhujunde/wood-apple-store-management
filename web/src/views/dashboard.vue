@@ -86,7 +86,7 @@
           <div v-else>
             <div v-for="o in pendingShip" :key="o.id" class="todo-item" @click="goOrders('新建')">
               <div class="todo-main">{{ o.customer }} <span class="todo-sub">{{ o.order_no }}</span></div>
-              <div class="todo-meta">{{ o.door_bom_name }} · {{ o.qty }}樘 · 下单 {{ o.order_date }}</div>
+              <div class="todo-meta">{{ o.door_bom_name }} · {{ o.qty }}樘 · 下单 {{ fmtDate(o.order_date) }}</div>
             </div>
             <el-button link type="primary" size="small" @click="goOrders('新建')">查看全部 →</el-button>
           </div>
@@ -107,7 +107,7 @@
           <div v-else>
             <div v-for="o in pendingPay" :key="o.id" class="todo-item" @click="goOrders('已发货')">
               <div class="todo-main">{{ o.customer }} <span class="todo-sub">{{ o.order_no }}</span></div>
-              <div class="todo-meta">应收 ¥{{ o.total_amount }} · 发货 {{ o.actual_ship_date }}</div>
+              <div class="todo-meta">应收 ¥{{ o.total_amount }} · 发货 {{ fmtDate(o.actual_ship_date) }}</div>
             </div>
             <el-button link type="primary" size="small" @click="goOrders('已发货')">查看全部 →</el-button>
           </div>
@@ -138,6 +138,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { inventoryApi, inboundApi, suggestionApi, orderApi } from '../api'
+import { fmtDate } from '../utils/date'
 
 const router = useRouter()
 const inventory = ref([])

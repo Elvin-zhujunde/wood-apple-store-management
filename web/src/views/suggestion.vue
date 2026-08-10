@@ -36,7 +36,7 @@
           <el-tag :type="row.status === '已采购' ? 'success' : 'warning'" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="生成时间" width="170" />
+      <el-table-column prop="created_at" label="生成时间" width="170" :formatter="dateTimeFmt" />
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <template v-if="row.status === '待采购'">
@@ -94,6 +94,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { suggestionApi } from '../api'
+import { dateTimeFmt } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 

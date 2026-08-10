@@ -44,7 +44,7 @@
         <el-button type="primary" size="small" @click="searchLogs">查询</el-button>
       </div>
       <el-table :data="detail?.logs || []" size="small" border style="margin-top:8px">
-        <el-table-column prop="created_at" label="时间" width="170" />
+        <el-table-column prop="created_at" label="时间" width="170" :formatter="dateTimeFmt" />
         <el-table-column label="类型" width="80">
           <template #default="{ row }">
             <el-tag :type="row.change_type === 'in' ? 'success' : 'danger'" size="small">
@@ -64,6 +64,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { inventoryApi } from '../api'
+import { dateTimeFmt } from '../utils/date'
 
 const query = ref({ category: '', keyword: '' })
 const list = ref([])

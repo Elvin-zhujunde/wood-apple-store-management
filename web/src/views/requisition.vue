@@ -18,7 +18,7 @@
       <el-table-column prop="material_name" label="物料" width="110" />
       <el-table-column prop="spec" label="规格" min-width="140" />
       <el-table-column prop="qty" label="领用数量" width="100" align="right" />
-      <el-table-column prop="req_date" label="领用日期" width="120" />
+      <el-table-column prop="req_date" label="领用日期" width="120" :formatter="dateFmt" />
       <el-table-column prop="handler" label="经手人" width="90" />
     </el-table>
     <el-pagination
@@ -58,6 +58,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { requisitionApi, materialApi, orderApi } from '../api'
+import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
@@ -98,7 +99,7 @@ function onMaterial() {}
 function openAdd() {
   form.value = {
     order_id: '', material_id: '', qty: 0,
-    req_date: new Date().toISOString().slice(0, 10), handler: store.name,
+    req_date: todayLocal(), handler: store.name,
   }
   orderOptions.value = []
   addVisible.value = true

@@ -25,9 +25,9 @@
       <el-table-column prop="qty" label="数量(樘)" width="90" align="right" />
       <el-table-column prop="total_amount" label="总金额" width="100" align="right" />
       <el-table-column prop="handler_sale" label="经手人" width="80" />
-      <el-table-column prop="order_date" label="下单日" width="120" />
-      <el-table-column prop="actual_ship_date" label="发货日" width="120" />
-      <el-table-column prop="pay_date" label="收款日" width="120" />
+      <el-table-column prop="order_date" label="下单日" width="120" :formatter="dateFmt" />
+      <el-table-column prop="actual_ship_date" label="发货日" width="120" :formatter="dateFmt" />
+      <el-table-column prop="pay_date" label="收款日" width="120" :formatter="dateFmt" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
@@ -173,6 +173,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { orderApi, bomApi } from '../api'
+import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
@@ -211,7 +212,7 @@ function statusType(s) {
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  return todayLocal()
 }
 
 async function load() {
