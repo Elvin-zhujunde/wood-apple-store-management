@@ -84,6 +84,11 @@ CREATE TABLE sales_orders (
   pay_date           DATE         NULL COMMENT '收款日期',
   receipt_no         VARCHAR(50)  NULL COMMENT '收据单号',
   handler_finance    VARCHAR(50)  NULL COMMENT '收款经手人',
+  door_h             DECIMAL(8,2) NULL COMMENT '门洞高(mm)',
+  door_w             DECIMAL(8,2) NULL COMMENT '门洞宽(mm)',
+  wall_thick         DECIMAL(8,2) NULL COMMENT '墙厚(mm)',
+  style              VARCHAR(50)  NULL COMMENT '款式编号',
+  board              VARCHAR(50)  NULL COMMENT '板材',
   status             ENUM('新建','已发货','已收款') NOT NULL DEFAULT '新建',
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_bom FOREIGN KEY (door_bom_id) REFERENCES door_bom(id)
@@ -158,3 +163,13 @@ CREATE TABLE purchase_suggestion (
   CONSTRAINT fk_sug_material FOREIGN KEY (material_id) REFERENCES materials(id),
   CONSTRAINT fk_sug_order    FOREIGN KEY (order_id) REFERENCES sales_orders(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购建议';
+
+-- ============================================================
+-- 种子数据:门型BOM(2026年木果订单 Excel 实际门型code)
+-- MG=厂做木门 YX=永旭系列 FS=福顺系列(Excel历史订单仅此三种门型)
+-- ============================================================
+INSERT INTO door_bom (code,name,standard_size,colors,nonstd_markup) VALUES
+  ('M-101','现代极简平板门','2100x900x240','默认',0),
+  ('MG','厂做木门','按订单','按款式',0),
+  ('YX','永旭系列门','按订单','烟雨江南2号,湖光秋月,似水年华',0),
+  ('FS','福顺系列门','按订单','秋水胡桃,奶茶灰',0);
