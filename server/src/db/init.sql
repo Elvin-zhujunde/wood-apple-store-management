@@ -153,6 +153,7 @@ CREATE TABLE purchase_suggestion (
   order_id    INT           NOT NULL COMMENT '关联订单',
   priority    ENUM('紧急','常规') NOT NULL DEFAULT '常规',
   status      ENUM('待采购','已采购') NOT NULL DEFAULT '待采购',
+  inbound_id  INT           NULL COMMENT '采纳后生成的采购入库单id(可溯源)',
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_sug_material FOREIGN KEY (material_id) REFERENCES materials(id),
   CONSTRAINT fk_sug_order    FOREIGN KEY (order_id) REFERENCES sales_orders(id)

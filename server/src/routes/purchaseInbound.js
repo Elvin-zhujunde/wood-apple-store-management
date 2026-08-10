@@ -81,6 +81,11 @@ router.put(
         'INSERT INTO inventory_log (material_id, change_type, qty, ref_no, operator) VALUES (?, ?, ?, ?, ?)',
         [pi.material_id, 'in', pi.qty, pi.inbound_no, req.user.name]
       );
+      // 联动：若该入库单由建议采纳生成（suggestion.inbound_id 指向本单），确保建议为已采购
+      await conn.query(
+        'UPDATE purchase_suggestion SET status=? WHERE inbound_id=? AND status=?',
+        ['已采购', req.params.id, '待采购']
+      );
       await conn.commit();
       ok(res, null, '已确认到货，库存已增加');
     } catch (e) {

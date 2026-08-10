@@ -12,7 +12,7 @@
       <el-button type="primary" @click="load">查询</el-button>
     </div>
     <el-alert type="warning" :closable="false" style="margin-bottom:12px">
-      系统在<strong>销售订单保存时自动按 BOM 拆解</strong>物料需求并对比库存生成采购建议，下方为当前待办。
+      系统在<strong>销售订单保存时自动按 BOM 拆解</strong>物料需求并对比库存生成采购建议。点【采纳】可一键生成待到货采购入库单，到货确认后库存自动增加。
     </el-alert>
     <el-table :data="list" stripe border>
       <el-table-column prop="order_no" label="关联订单" width="160" />
@@ -34,9 +34,13 @@
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="生成时间" width="170" />
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="row.status === '待采购'" link type="primary" @click="markDone(row)">标记已采购</el-button>
+          <template v-if="row.status === '待采购'">
+            <el-button link type="primary" class="row-btn" @click="openAdopt(row)">采纳</el-button>
+            <el-button link type="info" @click="markDone(row)">仅标记</el-button>
+          </template>
+          <el-button v-else link type="primary" @click="viewInbound(row)">查看采购单</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -48,22 +52,85 @@
       style="margin-top:12px"
       @current-change="load"
     />
+
+    <!-- 采纳弹窗：补厂家/进价/预计到货，数量默认建议量 -->
+    <el-dialog v-model="adoptVisible" title="采纳采购建议" width="480px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        <strong>{{ adoptRow?.name }}</strong> · {{ adoptRow?.code }} · 关联订单 {{ adoptRow?.order_no }}（{{ adoptRow?.customer }}）
+      </el-alert>
+      <el-form :model="adoptForm" label-width="100px">
+        <el-form-item label="采购数量" required>
+          <el-input-number v-model="adoptForm.qty" :min="0" :precision="3" style="width:100%" />
+          <div class="muted">默认取建议采购量 {{ adoptRow?.suggest_qty }}，可调整</div>
+        </el-form-item>
+        <el-form-item label="进货厂家" required>
+          <el-input v-model="adoptForm.supplier" placeholder="供货厂家" />
+        </el-form-item>
+        <el-form-item label="进货单价" required>
+          <el-input-number v-model="adoptForm.unit_price" :min="0" :precision="2" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="物流费用">
+          <el-input-number v-model="adoptForm.freight" :min="0" :precision="2" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="预计到货">
+          <el-date-picker v-model="adoptForm.expected_arrival" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="经手人" required>
+          <el-input v-model="adoptForm.handler" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adoptVisible = false">取消</el-button>
+        <el-button type="primary" @click="onAdopt">确认采纳（生成采购单）</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { suggestionApi } from '../api'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '../store/user'
 
+const router = useRouter()
+const store = useUserStore()
 const query = ref({ status: '待采购', priority: '', page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
+
+const adoptVisible = ref(false)
+const adoptRow = ref(null)
+const adoptForm = ref({})
 
 async function load() {
   const res = await suggestionApi.list(query.value)
   list.value = res.data.list
   total.value = res.data.total
+}
+
+function openAdopt(row) {
+  adoptRow.value = row
+  adoptForm.value = {
+    qty: Number(row.suggest_qty),
+    supplier: '',
+    unit_price: 0,
+    freight: 0,
+    expected_arrival: '',
+    handler: store.name,
+  }
+  adoptVisible.value = true
+}
+
+async function onAdopt() {
+  const f = adoptForm.value
+  if (!f.qty || !f.supplier || !f.unit_price || !f.handler)
+    return ElMessage.warning('请补全厂家/进价/经手人')
+  const res = await suggestionApi.adopt(adoptRow.value.id, f)
+  ElMessage.success(`已采纳，已生成采购入库单 ${res.data.inbound_no}（待到货）`)
+  adoptVisible.value = false
+  load()
 }
 
 async function markDone(row) {
@@ -72,5 +139,17 @@ async function markDone(row) {
   load()
 }
 
+function viewInbound(row) {
+  // 已采纳的跳采购入库页（inbound_id 可溯源，但列表页暂不带筛选，直接跳）
+  router.push('/inbound')
+}
+
 onMounted(load)
 </script>
+
+<style scoped>
+.muted { color: #909399; font-size: 12px; margin-top: 2px; }
+@media (max-width: 768px) {
+  .row-btn { min-height: 44px; padding: 0 12px; }
+}
+</style>

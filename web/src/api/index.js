@@ -59,4 +59,5 @@ export const suggestionApi = {
   list: (params) => request.get('/purchase-suggestion', { params }),
   generate: (order_id) => request.post('/purchase-suggestion/generate', { order_id }),
   updateStatus: (id, status) => request.put('/purchase-suggestion/' + id + '/status', { status }),
+  adopt: (id, data) => request.post('/purchase-suggestion/' + id + '/adopt', data),
 }
