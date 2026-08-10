@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# 项目开发临时产物
+screenshots/
+scripts/node_modules/
+migration/wood_store_backup.sql
+migration/node_modules/

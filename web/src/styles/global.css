@@ -1,0 +1,6 @@
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; padding: 0; height: 100%; font-family: -apple-system, "Microsoft YaHei", sans-serif; }
+.page-card { padding: 16px; }
+.toolbar { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.el-table .cell { font-size: 13px; }
+.muted { color: #909399; font-size: 12px; }

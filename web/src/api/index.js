@@ -1,0 +1,62 @@
+import request from './request'
+
+// 鉴权
+export const authApi = {
+  login: (data) => request.post('/auth/login', data),
+  me: () => request.get('/auth/me'),
+}
+
+// 物料档案
+export const materialApi = {
+  list: (params) => request.get('/materials', { params }),
+  all: () => request.get('/materials/all'),
+  detail: (id) => request.get('/materials/' + id),
+  create: (data) => request.post('/materials', data),
+  update: (id, data) => request.put('/materials/' + id, data),
+  remove: (id) => request.delete('/materials/' + id),
+}
+
+// 门型BOM
+export const bomApi = {
+  list: (params) => request.get('/door-bom', { params }),
+  all: () => request.get('/door-bom/all'),
+  detail: (id) => request.get('/door-bom/' + id),
+  create: (data) => request.post('/door-bom', data),
+  update: (id, data) => request.put('/door-bom/' + id, data),
+  remove: (id) => request.delete('/door-bom/' + id),
+}
+
+// 销售订单
+export const orderApi = {
+  list: (params) => request.get('/sales-orders', { params }),
+  detail: (id) => request.get('/sales-orders/' + id),
+  create: (data) => request.post('/sales-orders', data),
+  update: (id, data) => request.put('/sales-orders/' + id, data),
+}
+
+// 采购入库
+export const inboundApi = {
+  list: (params) => request.get('/purchase-inbound', { params }),
+  detail: (id) => request.get('/purchase-inbound/' + id),
+  create: (data) => request.post('/purchase-inbound', data),
+  confirm: (id, data) => request.put('/purchase-inbound/' + id + '/confirm', data),
+}
+
+// 生产领料
+export const requisitionApi = {
+  list: (params) => request.get('/requisition', { params }),
+  create: (data) => request.post('/requisition', data),
+}
+
+// 库存
+export const inventoryApi = {
+  list: (params) => request.get('/inventory', { params }),
+  detail: (id) => request.get('/inventory/' + id),
+}
+
+// 采购建议
+export const suggestionApi = {
+  list: (params) => request.get('/purchase-suggestion', { params }),
+  generate: (order_id) => request.post('/purchase-suggestion/generate', { order_id }),
+  updateStatus: (id, status) => request.put('/purchase-suggestion/' + id + '/status', { status }),
+}

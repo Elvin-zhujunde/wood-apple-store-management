@@ -1,0 +1,15 @@
+{
+  "name": "wood-store-migration",
+  "version": "1.0.0",
+  "private": true,
+  "description": "数据迁移脚本",
+  "scripts": {
+    "export": "node export.js",
+    "import": "node import.js",
+    "create-db": "node create-db.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.0"
+  }
+}
