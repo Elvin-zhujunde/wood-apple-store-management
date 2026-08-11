@@ -80,7 +80,8 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# 前端构建产物：根目录 dist 需提交（跟着 github 传，部署用），仅忽略 web/dist
+web/dist
 .output
 
 # Gatsby files
