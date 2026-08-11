@@ -148,3 +148,7 @@ screenshots/
 scripts/node_modules/
 migration/wood_store_backup.sql
 migration/node_modules/
+
+# 部署打包产物（node deploy.js 生成，不入库）
+deploy/
+deploy-*.zip
