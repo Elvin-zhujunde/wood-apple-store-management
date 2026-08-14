@@ -164,3 +164,7 @@ server/src/db/export-data.js
 ScreenShot_*.png
 screenshots/*.png
 
+# deploy-hook 部署webhook服务：源码入库，仅忽略运行时产物（临时上传包/日志；.env已被全局.env规则覆盖）
+deploy-hook/uploads/
+deploy-hook/logs/
+

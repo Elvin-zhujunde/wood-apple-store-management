@@ -1,0 +1,15 @@
+{
+  "name": "deploy-hook",
+  "version": "1.0.0",
+  "private": true,
+  "description": "木门库存系统 - 部署 webhook（接 zip 包自动备份/解压/pm2 reload）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^2.2.0"
+  }
+}
