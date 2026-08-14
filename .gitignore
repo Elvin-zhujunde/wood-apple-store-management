@@ -152,3 +152,15 @@ migration/node_modules/
 # 部署打包产物（node deploy.js 生成，不入库）
 deploy/
 deploy-*.zip
+
+# 敏感数据库导出（含密码哈希/客户数据，仅本地或目标服务器用，禁止入库）
+wood_store_data.sql
+wood_store.sql
+server/src/db/wood_store_data.sql
+# 导出工具含硬编码 DB 密码，待脱敏（改读环境变量）后再考虑入库
+server/src/db/export-data.js
+
+# 本地截图（非项目资产）
+ScreenShot_*.png
+screenshots/*.png
+

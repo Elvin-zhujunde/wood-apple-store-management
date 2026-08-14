@@ -32,6 +32,8 @@ export const orderApi = {
   detail: (id) => request.get('/sales-orders/' + id),
   create: (data) => request.post('/sales-orders', data),
   update: (id, data) => request.put('/sales-orders/' + id, data),
+  batchShip: (data) => request.put('/sales-orders/batch/ship', data),
+  batchPay: (data) => request.put('/sales-orders/batch/pay', data),
 }
 
 // 采购入库
@@ -40,6 +42,7 @@ export const inboundApi = {
   detail: (id) => request.get('/purchase-inbound/' + id),
   create: (data) => request.post('/purchase-inbound', data),
   confirm: (id, data) => request.put('/purchase-inbound/' + id + '/confirm', data),
+  batchConfirm: (data) => request.put('/purchase-inbound/batch/confirm', data),
 }
 
 // 生产领料

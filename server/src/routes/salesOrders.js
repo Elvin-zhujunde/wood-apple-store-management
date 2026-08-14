@@ -62,6 +62,46 @@ router.get(
   })
 );
 
+// 批量发货：勾选的"新建"订单统一填发货日/经手人/发货单号 → 批量转"已发货"
+// 同批次共享一个发货单号（适合一批货一起发的场景；需不同单号请逐条操作）
+router.put(
+  '/batch/ship',
+  wrap(async (req, res) => {
+    const { ids, actual_ship_date, ship_no, handler_ship } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return fail(res, '请选择订单');
+    if (!actual_ship_date || !ship_no || !handler_ship) return fail(res, '发货日期/发货单号/发货经手人 必填');
+    const date = String(actual_ship_date).slice(0, 10);
+    const [r] = await pool.query(
+      `UPDATE sales_orders
+        SET actual_ship_date=?, ship_no=?, handler_ship=?, status='已发货'
+       WHERE id IN (?) AND status='新建'`,
+      [date, ship_no, handler_ship, ids]
+    );
+    const skipped = ids.length - r.affectedRows;
+    ok(res, { success: r.affectedRows, skipped }, `批量发货完成：${r.affectedRows} 单成功${skipped ? `，${skipped} 单非"新建"已跳过` : ''}`);
+  })
+);
+
+// 批量收款：勾选的"新建/已发货"订单统一填收款日/收据号/经手人 → 批量转"已收款"
+// 兼容预付款(新建直接收款)与发货后收款(已发货)两种场景
+router.put(
+  '/batch/pay',
+  wrap(async (req, res) => {
+    const { ids, pay_date, receipt_no, handler_finance } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return fail(res, '请选择订单');
+    if (!pay_date || !receipt_no || !handler_finance) return fail(res, '收款日期/收据单号/收款经手人 必填');
+    const date = String(pay_date).slice(0, 10);
+    const [r] = await pool.query(
+      `UPDATE sales_orders
+        SET pay_date=?, receipt_no=?, handler_finance=?, status='已收款'
+       WHERE id IN (?) AND status IN ('新建','已发货')`,
+      [date, receipt_no, handler_finance, ids]
+    );
+    const skipped = ids.length - r.affectedRows;
+    ok(res, { success: r.affectedRows, skipped }, `批量收款完成：${r.affectedRows} 单成功${skipped ? `，${skipped} 单已收款已跳过` : ''}`);
+  })
+);
+
 // 详情
 router.get(
   '/:id',

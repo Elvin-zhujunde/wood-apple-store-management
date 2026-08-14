@@ -16,8 +16,11 @@
       <el-button type="primary" @click="load">查询</el-button>
       <el-button @click="resetQuery">重置</el-button>
       <el-button type="success" @click="openAdd">+ 接单</el-button>
+      <el-button type="warning" :disabled="batchShipableCount === 0" @click="openBatchShip">批量发货 ({{ batchShipableCount }})</el-button>
+      <el-button type="warning" :disabled="batchPayableCount === 0" @click="openBatchPay">批量收款 ({{ batchPayableCount }})</el-button>
     </div>
-    <el-table :data="list" stripe border>
+    <el-table :data="list" stripe border @selection-change="onSelectionChange">
+      <el-table-column type="selection" width="42" />
       <el-table-column prop="order_no" label="订单号" width="160" />
       <el-table-column prop="customer" label="客户" min-width="120" />
       <el-table-column prop="door_bom_name" label="门型" width="120" />
@@ -92,6 +95,52 @@
       <template #footer>
         <el-button @click="payVisible = false">取消</el-button>
         <el-button type="primary" @click="onPay">确认收款</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量发货弹窗 -->
+    <el-dialog v-model="batchShipVisible" title="批量发货" width="440px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        共选中 <strong>{{ selectedRows.length }}</strong> 单，其中 <strong>{{ batchShipableCount }}</strong> 单为"新建"可发货
+        <div v-if="batchShipableCount < selectedRows.length" style="color:#e6a23c;margin-top:4px">非"新建"订单将自动跳过</div>
+      </el-alert>
+      <el-form :model="batchShipForm" label-width="100px">
+        <el-form-item label="实际发货日" required>
+          <el-date-picker v-model="batchShipForm.actual_ship_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="发货单号" required>
+          <el-input v-model="batchShipForm.ship_no" placeholder="同一批次共用一个发货单号" />
+        </el-form-item>
+        <el-form-item label="发货经手人">
+          <el-input v-model="batchShipForm.handler_ship" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchShipVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="batchShipableCount === 0" @click="onBatchShip">确认批量发货</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量收款弹窗 -->
+    <el-dialog v-model="batchPayVisible" title="批量收款" width="440px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        共选中 <strong>{{ selectedRows.length }}</strong> 单，其中 <strong>{{ batchPayableCount }}</strong> 单可收款
+        <div v-if="batchPayableCount < selectedRows.length" style="color:#e6a23c;margin-top:4px">已收款订单将自动跳过</div>
+      </el-alert>
+      <el-form :model="batchPayForm" label-width="100px">
+        <el-form-item label="收款日期" required>
+          <el-date-picker v-model="batchPayForm.pay_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="收据单号" required>
+          <el-input v-model="batchPayForm.receipt_no" placeholder="同一批次共用一个收据单号" />
+        </el-form-item>
+        <el-form-item label="收款经手人">
+          <el-input v-model="batchPayForm.handler_finance" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchPayVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="batchPayableCount === 0" @click="onBatchPay">确认批量收款</el-button>
       </template>
     </el-dialog>
 
@@ -205,6 +254,13 @@ const payVisible = ref(false)
 const payRow = ref(null)
 const payForm = ref({})
 
+// 批量操作
+const selectedRows = ref([])
+const batchShipVisible = ref(false)
+const batchShipForm = ref({})
+const batchPayVisible = ref(false)
+const batchPayForm = ref({})
+
 const colorOptions = computed(() => {
   const bom = bomList.value.find((b) => b.id === form.value.door_bom_id)
   return bom?.colors ? bom.colors.split(',') : []
@@ -216,6 +272,44 @@ const bomSpec = computed(() => {
 
 function statusType(s) {
   return { 新建: 'info', 已发货: 'warning', 已收款: 'success' }[s] || 'info'
+}
+
+// 批量：选中行中可发货/可收款的数量（后端也会做幂等校验，此处用于按钮可用性与提示）
+const batchShipableCount = computed(() => selectedRows.value.filter((r) => r.status === '新建').length)
+const batchPayableCount = computed(() => selectedRows.value.filter((r) => r.status === '新建' || r.status === '已发货').length)
+
+function onSelectionChange(rows) {
+  selectedRows.value = rows
+}
+
+function openBatchShip() {
+  batchShipForm.value = { actual_ship_date: today(), ship_no: '', handler_ship: store.name }
+  batchShipVisible.value = true
+}
+
+async function onBatchShip() {
+  const f = batchShipForm.value
+  if (!f.actual_ship_date || !f.ship_no || !f.handler_ship) return ElMessage.warning('请补全发货日/发货单号/经手人')
+  const ids = selectedRows.value.map((r) => r.id)
+  const res = await orderApi.batchShip(ids, { ...f })
+  ElMessage.success(res.msg || '批量发货完成')
+  batchShipVisible.value = false
+  load()
+}
+
+function openBatchPay() {
+  batchPayForm.value = { pay_date: today(), receipt_no: '', handler_finance: store.name }
+  batchPayVisible.value = true
+}
+
+async function onBatchPay() {
+  const f = batchPayForm.value
+  if (!f.pay_date || !f.receipt_no || !f.handler_finance) return ElMessage.warning('请补全收款日/收据单号/经手人')
+  const ids = selectedRows.value.map((r) => r.id)
+  const res = await orderApi.batchPay(ids, { ...f })
+  ElMessage.success(res.msg || '批量收款完成')
+  batchPayVisible.value = false
+  load()
 }
 
 function today() {

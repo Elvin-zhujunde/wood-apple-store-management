@@ -15,8 +15,10 @@
       <el-button type="primary" @click="load">查询</el-button>
       <el-button @click="resetQuery">重置</el-button>
       <el-button type="success" @click="openAdd">+ 入库单</el-button>
+      <el-button type="warning" :disabled="batchConfirmableCount === 0" @click="openBatchConfirm">批量确认到货 ({{ batchConfirmableCount }})</el-button>
     </div>
-    <el-table :data="list" stripe border>
+    <el-table :data="list" stripe border @selection-change="onSelectionChange">
+      <el-table-column type="selection" width="42" />
       <el-table-column prop="inbound_no" label="入库单号" width="160" />
       <el-table-column prop="material_name" label="物料" width="110" />
       <el-table-column prop="spec" label="规格" min-width="140" />
@@ -87,6 +89,24 @@
       </template>
     </el-dialog>
 
+    <!-- 批量确认到货 -->
+    <el-dialog v-model="batchConfirmVisible" title="批量确认到货" width="440px" :close-on-click-modal="false">
+      <el-alert type="warning" :closable="false" style="margin-bottom:12px">
+        共选中 <strong>{{ selectedRows.length }}</strong> 单，其中 <strong>{{ batchConfirmableCount }}</strong> 单为"待到货"可确认
+        <div v-if="batchConfirmableCount < selectedRows.length" style="color:#e6a23c;margin-top:4px">已到货订单将自动跳过</div>
+        <div style="margin-top:4px">确认后对应物料库存将增加，逐条独立处理，单条失败不影响其他。</div>
+      </el-alert>
+      <el-form label-width="100px">
+        <el-form-item label="实际到货日" required>
+          <el-date-picker v-model="batchConfirmDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchConfirmVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="batchConfirmableCount === 0" @click="onBatchConfirm">确认批量到货</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 图片管理（采购留痕：进货票据/到货实拍/运费票） -->
     <el-dialog v-model="imgVisible" :title="`采购入库图片 · ${curImgNo}`" width="560px">
       <el-alert type="info" :closable="false" style="margin-bottom:12px">采购留痕：可上传进货票据、到货实拍、运费票等。图片非必填。</el-alert>
@@ -117,6 +137,35 @@ const imgVisible = ref(false)
 const curImgId = ref(null)
 const curImgNo = ref('')
 const imgList = ref([])
+
+// 批量确认到货
+const selectedRows = ref([])
+const batchConfirmVisible = ref(false)
+const batchConfirmDate = ref('')
+const batchConfirmableCount = computed(() => selectedRows.value.filter((r) => r.status === '待到货').length)
+
+function onSelectionChange(rows) {
+  selectedRows.value = rows
+}
+
+function openBatchConfirm() {
+  batchConfirmDate.value = todayLocal()
+  batchConfirmVisible.value = true
+}
+
+async function onBatchConfirm() {
+  if (!batchConfirmDate.value) return ElMessage.warning('请选择到货日期')
+  const ids = selectedRows.value.map((r) => r.id)
+  const res = await inboundApi.batchConfirm(ids, { actual_arrival: batchConfirmDate.value })
+  const d = res.data || {}
+  if (d.failed > 0) {
+    ElMessage.warning(res.msg || `批量确认完成：${d.success} 成功，${d.failed} 失败`)
+  } else {
+    ElMessage.success(res.msg || `批量确认完成：${d.success} 单成功`)
+  }
+  batchConfirmVisible.value = false
+  load()
+}
 
 const curSpec = computed(() => {
   const m = mats.value.find((x) => x.id === form.value.material_id)

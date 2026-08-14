@@ -34,6 +34,60 @@ router.get(
   })
 );
 
+// 批量确认到货：勾选的"待到货"入库单统一填到货日 → 批量加库存+写流水
+// 逐条独立事务，单条失败不影响其他条；已到货的自动跳过
+router.put(
+  '/batch/confirm',
+  wrap(async (req, res) => {
+    const { ids, actual_arrival } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return fail(res, '请选择入库单');
+    if (!actual_arrival) return fail(res, '请填写实际到货日期');
+    const date = String(actual_arrival).slice(0, 10);
+
+    // 一次性查出选中入库单（避免逐条查询）
+    const [rows] = await pool.query('SELECT * FROM purchase_inbound WHERE id IN (?)', [ids]);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+
+    let success = 0, skipped = 0, failed = 0;
+    const errors = [];
+    for (const id of ids) {
+      const pi = byId.get(id);
+      if (!pi || pi.status === '已到货') { skipped++; continue; }
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query(
+          'UPDATE purchase_inbound SET actual_arrival=?, status=? WHERE id=?',
+          [date, '已到货', id]
+        );
+        await conn.query(
+          'UPDATE materials SET stock_qty = stock_qty + ? WHERE id = ?',
+          [pi.qty, pi.material_id]
+        );
+        await conn.query(
+          'INSERT INTO inventory_log (material_id, change_type, qty, ref_no, operator) VALUES (?, ?, ?, ?, ?)',
+          [pi.material_id, 'in', pi.qty, pi.inbound_no, req.user.name]
+        );
+        // 联动：建议采纳生成的入库单确认后，建议置为已采购
+        await conn.query(
+          'UPDATE purchase_suggestion SET status=? WHERE inbound_id=? AND status=?',
+          ['已采购', id, '待采购']
+        );
+        await conn.commit();
+        success++;
+      } catch (e) {
+        await conn.rollback();
+        failed++;
+        errors.push(`${pi.inbound_no}: ${e.message}`);
+      } finally {
+        conn.release();
+      }
+    }
+    const msg = `批量确认到货：${success} 单成功${skipped ? `，${skipped} 单已到货跳过` : ''}${failed ? `，${failed} 单失败` : ''}`;
+    ok(res, { success, skipped, failed, errors }, msg);
+  })
+);
+
 // 新增（待到货，库存不变）
 router.post(
   '/',
