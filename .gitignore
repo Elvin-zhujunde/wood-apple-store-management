@@ -168,3 +168,6 @@ screenshots/*.png
 deploy-hook/uploads/
 deploy-hook/logs/
 
+# deploy-push 一键部署脚本：本地私有配置含 webhook token，禁止入库
+deploy-push.config.json
+
