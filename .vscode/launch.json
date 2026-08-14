@@ -1,0 +1,36 @@
+{
+  // 木门库存与订单管理系统 - VS Code 调试启动配置
+  // 用法：调试面板下拉选 "🚀 一键启动 (前后端)" → 按 F5
+  // 停止：Shift+F5 或调试工具栏停止按钮（会同时停前后端）
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "后端 (server)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "restartOnSuccess": false
+    },
+    {
+      "name": "前端 (web)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--open"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🚀 一键启动 (前后端)",
+      "configurations": ["后端 (server)", "前端 (web)"],
+      "stopAll": true
+    }
+  ]
+}
