@@ -5,28 +5,24 @@
         <el-option label="待采购" value="待采购" />
         <el-option label="已采购" value="已采购" />
       </el-select>
-      <el-select v-model="query.priority" placeholder="优先级" clearable style="width:120px" @change="load">
-        <el-option label="紧急" value="紧急" />
-        <el-option label="常规" value="常规" />
-      </el-select>
-      <el-input v-model="query.customer" placeholder="客户名称" clearable style="width:150px" @change="load" />
       <el-input v-model="query.material_name" placeholder="物料名称" clearable style="width:140px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
       <el-button @click="resetQuery">重置</el-button>
       <el-button type="warning" @click="rescan">刷新建议</el-button>
     </div>
     <el-alert type="warning" :closable="false" style="margin-bottom:12px">
-      系统在<strong>销售订单保存时自动按 BOM 拆解</strong>物料需求并对比库存生成采购建议。点【采纳】可一键生成待到货采购入库单，到货确认后库存自动增加。
+      系统按<strong>安全库存</strong>驱动：库存 ≤ 安全库存时生成采购建议（<strong>不自动算采购量</strong>，采纳时采购员自填）。领料出库后自动检查、入库到货后自动消除。点【采纳】可一键生成待到货采购入库单。
     </el-alert>
     <el-table :data="list" stripe border>
-      <el-table-column prop="order_no" label="关联订单" width="160" />
-      <el-table-column prop="customer" label="客户" min-width="120" />
       <el-table-column prop="code" label="物料编码" width="100" />
       <el-table-column prop="name" label="物料名称" width="110" />
       <el-table-column prop="spec" label="规格" min-width="140" />
-      <el-table-column prop="suggest_qty" label="建议采购量" width="110" align="right">
-        <template #default="{ row }"><strong style="color:#f56c6c">{{ row.suggest_qty }}</strong></template>
+      <el-table-column label="当前库存" width="100" align="right">
+        <template #default="{ row }">
+          <strong :style="{ color: Number(row.stock_qty) <= Number(row.safety_stock) ? '#f56c6c' : '#67c23a' }">{{ row.stock_qty }}</strong>
+        </template>
       </el-table-column>
+      <el-table-column prop="safety_stock" label="安全库存" width="100" align="right" />
       <el-table-column label="缺口" width="90" align="right">
         <template #default="{ row }">
           <strong style="color:#f56c6c">{{ (Number(row.safety_stock) - Number(row.stock_qty)).toFixed(3) }}</strong>
@@ -101,7 +97,7 @@ import { useUserStore } from '../store/user'
 
 const router = useRouter()
 const store = useUserStore()
-const query = ref({ status: '待采购', priority: '', customer: '', material_name: '', page: 1, pageSize: 20 })
+const query = ref({ status: '待采购', material_name: '', page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
 
@@ -116,7 +112,7 @@ async function load() {
 }
 
 function resetQuery() {
-  query.value = { status: '待采购', priority: '', customer: '', material_name: '', page: 1, pageSize: 20 }
+  query.value = { status: '待采购', material_name: '', page: 1, pageSize: 20 }
   load()
 }
 
