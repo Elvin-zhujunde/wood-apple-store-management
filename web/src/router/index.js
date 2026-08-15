@@ -19,7 +19,6 @@ const routes = [
       { path: 'inbound', name: 'inbound', component: () => import('../views/inbound.vue'), meta: { title: '采购入库' } },
       { path: 'requisition', name: 'requisition', component: () => import('../views/requisition.vue'), meta: { title: '生产领料' } },
       { path: 'materials', name: 'materials', component: () => import('../views/materials.vue'), meta: { title: '物料档案' } },
-      { path: 'report/inventory', name: 'report-inventory', component: () => import('../views/reportInventory.vue'), meta: { title: '库存总表' } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },

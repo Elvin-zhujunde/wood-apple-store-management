@@ -71,6 +71,11 @@ export const cuttingApi = {
   getTags: () => request.get('/cutting-list/tags'),
 }
 
+// 工作台看板聚合
+export const dashboardApi = {
+  stats: () => request.get('/dashboard'),
+}
+
 // 业务图片附件
 export const attachmentApi = {
   list: (entity_type, entity_id) => request.get('/attachments', { params: { entity_type, entity_id } }),

@@ -8,7 +8,7 @@
       <el-input v-model="query.keyword" placeholder="物料名称/编码" clearable style="width:200px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
     </div>
-    <el-table :data="list" stripe border>
+    <el-table :data="list" stripe border show-summary :summary-method="summary">
       <el-table-column prop="code" label="编码" width="100" />
       <el-table-column prop="name" label="物料名称" width="120" />
       <el-table-column prop="category" label="分类" width="80" />
@@ -78,6 +78,19 @@ const logTotal = ref(0)
 
 function statusType(s) {
   return { 充足: 'success', 不足: 'warning', 严重缺货: 'danger' }[s] || 'info'
+}
+
+// 汇总行：物料种数 + 缺货物料数（合并自原库存总表的汇总价值）
+function summary({ columns, data }) {
+  return columns.map((col, i) => {
+    if (i === 0) return '合计'
+    if (col.property === 'name') return `${data.length} 种物料`
+    if (col.property === 'status') {
+      const shortage = data.filter((m) => m.status !== '充足').length
+      return shortage ? `缺货 ${shortage} 种` : '全部充足'
+    }
+    return ''
+  })
 }
 
 async function load() {

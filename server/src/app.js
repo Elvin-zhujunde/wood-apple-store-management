@@ -24,6 +24,7 @@ app.use('/api/cutting-list', require('./routes/cuttingList'));
 app.use('/api/purchase-inbound', require('./routes/purchaseInbound'));
 app.use('/api/requisition', require('./routes/requisition'));
 app.use('/api/inventory', require('./routes/inventory'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/purchase-suggestion', require('./routes/purchaseSuggestion'));
 app.use('/api/attachments', require('./routes/attachments'));
 
