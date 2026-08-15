@@ -9,7 +9,7 @@
 wood-apple-store-management/
 ├── server/                 后端（Express + mysql2）
 │   ├── src/
-│   │   ├── db/             数据库连接池 + 建表SQL + 种子数据
+│   │   ├── db/             数据库连接池 + 表结构参考(schema)
 │   │   ├── routes/         7大业务模块路由
 │   │   ├── services/       采购建议算法（BOM拆解，核心）
 │   │   ├── middlewares/    JWT鉴权 + 角色权限
@@ -58,7 +58,7 @@ wood-apple-store-management/
 # 后端
 cd server && npm install
 cp .env.example .env   # 改 DB_PASSWORD 为你的 MySQL 密码
-npm run db:init && npm run db:seed
+mysql -u root -p < server/src/db/wood_store_data.sql   # 建表+数据一次导入
 npm start              # http://127.0.0.1:3001
 
 # 前端

@@ -1,5 +1,5 @@
 // 仅创建登录用户，不清业务表（生产/迁移安全用）
-// 与 seed.js 区别：seed.js 会清所有业务表+插示例数据，本脚本只确保有用户可登录
+// 非破坏性：只补登录账号，不清业务表、不插示例数据（生产数据通过 .sql 导入）
 const bcrypt = require('bcryptjs');
 const { pool } = require('./pool');
 

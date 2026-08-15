@@ -41,17 +41,20 @@
 打开 `server\.env` 文件（用记事本），把里面的 `DB_PASSWORD=010207` 改成**你自己的 MySQL root 密码**。
 如果 `server\.env` 不存在，把 `server\.env.example` 复制一份改名为 `.env`，再改密码。
 
-### 步骤 2：装后端依赖 + 建库建表
-在命令提示符里依次执行：
+### 步骤 2：装后端依赖 + 导入数据库
+在命令提示符里执行：
 ```
 cd server
 npm install
-npm run db:init
-npm run db:seed
 ```
 - `npm install` 装依赖（第一次比较慢，等几分钟）
-- `npm run db:init` 创建数据库 `wood_store` 和所有表
-- `npm run db:seed` 写入测试数据（3个账号 + 7种物料 + 1个门型）
+
+然后导入数据库（建库 + 建表 + 业务数据 + 登录账号一次到位）：
+```
+mysql -u root -p < src/db/wood_store_data.sql
+```
+- 导入后即有默认账号：sale / stock / finance，密码 123456
+- 若是空库只想补登录账号：`npm run db:seed-users`
 
 ### 步骤 3：装前端依赖
 ```
@@ -98,7 +101,7 @@ cd C:\wood-apple-store-management\migration
 **把 `wood_store_backup.sql` 拷到新机器**（U盘、网盘都行）。
 
 **在新机器上导入数据**：
-先按"三、首次部署"的步骤1、2（建好空库），然后执行：
+先按"三、首次部署"的步骤1、2，然后执行：
 ```
 cd C:\wood-apple-store-management\migration
 导入数据.bat
@@ -126,7 +129,7 @@ cd C:\wood-apple-store-management\migration
 A：端口被占用。打开 `server\.env`，把 `PORT=3001` 改成 `PORT=3002`（或其他没被占的），同时改 `web\vite.config.js` 里的代理 `target` 端口。
 
 **Q：登录提示"账号不存在"？**
-A：没执行 `npm run db:seed`，或数据库密码不对。检查 `server\.env` 的 `DB_PASSWORD`。
+A：数据库没导入数据，或数据库密码不对。执行 `mysql -u root -p < server/src/db/wood_store_data.sql` 导入，并检查 `server\.env` 的 `DB_PASSWORD`。
 
 **Q：前端打不开？**
 A：确认后端先启动了，前端窗口没关。访问地址看前端启动时显示的 `Local:` 那一行。

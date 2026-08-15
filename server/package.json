@@ -6,8 +6,6 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "db:init": "node src/db/init-db.js",
-    "db:seed": "node src/db/seed.js",
     "db:seed-users": "node src/db/seed-users.js"
   },
   "dependencies": {
