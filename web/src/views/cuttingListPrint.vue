@@ -37,6 +37,11 @@
             <div class="full"><label>备注</label><span>{{ row.remark || '-' }}</span></div>
           </div>
 
+          <div v-if="parseTags(row.remark_tags).length" class="tag-print-row">
+            <span class="tag-print-label">加工备注</span>
+            <span class="print-tag" v-for="(t, i) in parseTags(row.remark_tags)" :key="i">{{ t }}</span>
+          </div>
+
           <div class="size-box">
             <div class="size-item">
               <div class="size-label">门洞尺寸（高 × 宽）</div>
@@ -79,6 +84,7 @@
               <th class="door-col">门扇高</th>
               <th class="door-col">门扇宽</th>
               <th>模式</th>
+              <th>加工备注</th>
               <th>经手人</th>
               <th>下料日</th>
             </tr>
@@ -97,6 +103,7 @@
               <td class="door-col"><strong>{{ row.door_height }}</strong></td>
               <td class="door-col"><strong>{{ row.door_width }}</strong></td>
               <td>{{ row.mode === 2 ? '特殊' : '普通' }}</td>
+              <td class="tags-cell">{{ parseTags(row.remark_tags).join('，') || '-' }}</td>
               <td>{{ row.handler || '-' }}</td>
               <td>{{ fmtDate(row.cut_date) }}</td>
             </tr>
@@ -123,6 +130,15 @@ const loading = ref(true)
 
 function wallOf(row) {
   return row.wall_thickness != null ? row.wall_thickness : row.wall_thick != null ? row.wall_thick : '-'
+}
+function parseTags(raw) {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s) : []
+  } catch {
+    return []
+  }
 }
 function goBack() {
   router.push('/cutting-list')
@@ -184,6 +200,12 @@ onMounted(async () => {
 .size-arrow { font-size:30px; color:#bbb; }
 
 .sheet-foot { margin-top:auto; padding-top:14px; border-top:1px solid #eee; display:flex; justify-content:space-between; font-size:13px; color:#555; }
+
+/* 单张模式：加工备注标签 */
+.tag-print-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:10px 0 0; }
+.tag-print-label { font-size:13px; color:#666; margin-right:4px; }
+.print-tag { display:inline-block; border:1px solid #d43030; color:#d43030; border-radius:3px; padding:2px 8px; font-size:13px; font-weight:600; }
+.ledger-table td.tags-cell { font-size:11px; }
 
 /* 台账 */
 .ledger-wrap { width:210mm; margin:0 auto; background:#fff; padding:14mm 12mm; box-sizing:border-box; box-shadow:0 1px 6px rgba(0,0,0,.12); }

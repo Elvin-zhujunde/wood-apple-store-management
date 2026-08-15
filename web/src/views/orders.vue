@@ -203,6 +203,12 @@
         <el-form-item label="经手人">
           <el-input v-model="cutForm.handler" />
         </el-form-item>
+        <el-form-item label="加工备注">
+          <div class="tag-editor">
+            <el-tag v-for="(t, i) in cutForm.tags" :key="i" size="small" type="warning" closable @close="cutForm.tags.splice(i, 1)">{{ t }}</el-tag>
+            <el-input v-model="cutTagInput" size="small" placeholder="输入回车追加" class="tag-input" @keyup.enter="addCutTag" />
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="cuttingVisible = false">取消</el-button>
@@ -375,6 +381,7 @@ const batchPayForm = ref({})
 const cuttingVisible = ref(false)
 const cutRow = ref(null)
 const cutForm = ref({})
+const cutTagInput = ref('')
 const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 
 const colorOptions = computed(() => {
@@ -601,8 +608,16 @@ async function openCutting(row) {
     door_height: Number(row.door_h) - Number(cutConfig.value.defaultHeightCut),
     door_width: Number(row.door_w) - Number(cutConfig.value.defaultWidthCut),
     handler: store.name,
+    tags: [],
   }
+  cutTagInput.value = ''
   cuttingVisible.value = true
+}
+
+function addCutTag() {
+  const v = cutTagInput.value.trim()
+  if (v) cutForm.value.tags.push(v)
+  cutTagInput.value = ''
 }
 
 async function onCutting() {
@@ -617,6 +632,7 @@ async function onCutting() {
     door_height: f.door_height,
     door_width: f.door_width,
     handler: f.handler,
+    remark_tags: JSON.stringify(f.tags),
   })
   ElMessage.success('下料单已生成')
   cuttingVisible.value = false
@@ -635,6 +651,8 @@ onMounted(async () => {
 
 <style scoped>
 .muted { color: #909399; font-size: 12px; }
+.tag-editor { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
+.tag-input { width: 160px; }
 /* 欠款>0 输入框标红提示 */
 :deep(.balance-over .el-input__inner) { color: #f56c6c; font-weight: 600; }
 /* 移动端：行内操作按钮放大到手指好点 */

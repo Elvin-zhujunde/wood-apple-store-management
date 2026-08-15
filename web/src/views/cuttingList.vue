@@ -31,7 +31,14 @@
       <el-table-column prop="style" label="款式" width="100" />
       <el-table-column prop="color" label="颜色" width="80" />
       <el-table-column prop="frame_line" label="套板线条" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="remark" label="备注" width="90" show-overflow-tooltip />
+      <el-table-column label="备注" min-width="120">
+        <template #default="{ row }">
+          <span v-if="parseTags(row.remark_tags).length" class="tag-row">
+            <el-tag v-for="(t, i) in parseTags(row.remark_tags)" :key="i" size="small" type="warning" class="tag-item">{{ t }}</el-tag>
+          </span>
+          <span v-else class="muted">{{ row.remark || '-' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="board" label="板材" width="70" />
       <el-table-column label="门扇高" width="90" align="center">
         <template #default="{ row }"><strong style="color:#f56c6c">{{ row.door_height }}</strong></template>
@@ -85,6 +92,12 @@
         <el-form-item label="经手人">
           <el-input v-model="editForm.handler" />
         </el-form-item>
+        <el-form-item label="加工备注">
+          <div class="tag-editor">
+            <el-tag v-for="(t, i) in editForm.tags" :key="i" size="small" type="warning" closable class="tag-item" @close="editForm.tags.splice(i, 1)">{{ t }}</el-tag>
+            <el-input v-model="editTagInput" size="small" placeholder="输入回车追加" class="tag-input" @keyup.enter="addEditTag" />
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editVisible = false">取消</el-button>
@@ -129,9 +142,21 @@ const selectedRows = ref([])
 const editVisible = ref(false)
 const editRow = ref(null)
 const editForm = ref({})
+const editTagInput = ref('')
 const doneVisible = ref(false)
 const doneRow = ref(null)
 const doneForm = ref({})
+
+// remark_tags：DB 存 JSON.stringify 字符串数组，前端解析回数组渲染
+function parseTags(raw) {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s) : []
+  } catch {
+    return []
+  }
+}
 
 async function load() {
   const params = { ...query.value }
@@ -160,15 +185,28 @@ function openEdit(row) {
     door_height: Number(row.door_height),
     door_width: Number(row.door_width),
     handler: row.handler || store.name,
+    tags: parseTags(row.remark_tags),
   }
+  editTagInput.value = ''
   editVisible.value = true
+}
+
+function addEditTag() {
+  const v = editTagInput.value.trim()
+  if (v) editForm.value.tags.push(v)
+  editTagInput.value = ''
 }
 
 async function onEdit() {
   const f = editForm.value
   if (!f.door_height || !f.door_width) return ElMessage.warning('门扇高/宽必填')
-  await cuttingApi.update(editRow.value.id, { door_height: f.door_height, door_width: f.door_width, handler: f.handler })
-  ElMessage.success('已更新门扇尺寸')
+  await cuttingApi.update(editRow.value.id, {
+    door_height: f.door_height,
+    door_width: f.door_width,
+    handler: f.handler,
+    remark_tags: JSON.stringify(f.tags),
+  })
+  ElMessage.success('已更新')
   editVisible.value = false
   load()
 }
@@ -207,4 +245,8 @@ onMounted(async () => {
 .muted { color: #909399; font-size: 12px; }
 .size-cell { line-height: 1.4; }
 .size-cell .muted { display: block; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-item { margin: 0; }
+.tag-editor { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
+.tag-input { width: 160px; }
 </style>

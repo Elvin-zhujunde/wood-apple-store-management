@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS cutting_list (
   mode          TINYINT NOT NULL DEFAULT 1 COMMENT '1普通自动扣尺 2特殊手动录入',
   status        ENUM('待下料','已下料') NOT NULL DEFAULT '待下料',
   handler       VARCHAR(50) DEFAULT NULL COMMENT '经手人',
+  remark_tags   TEXT DEFAULT NULL COMMENT '加工备注标签(JSON.stringify 字符串数组,如["合页3个","喷漆偏深"])',
   cut_date      DATE DEFAULT NULL COMMENT '下料日期',
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_cut_order (order_id) COMMENT '一单一单:一订单一下料单',

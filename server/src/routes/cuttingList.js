@@ -70,7 +70,7 @@ router.get(
 router.post(
   '/',
   wrap(async (req, res) => {
-    const { order_id, mode = 1, door_height, door_width, handler } = req.body;
+    const { order_id, mode = 1, door_height, door_width, handler, remark_tags } = req.body;
     if (!order_id) return fail(res, '缺少订单 id');
     // 取订单门洞尺寸（快照源）
     const [orders] = await pool.query(
@@ -97,9 +97,9 @@ router.post(
     try {
       const [r] = await pool.query(
         `INSERT INTO cutting_list
-          (order_id, hole_height, hole_width, wall_thickness, door_height, door_width, mode, handler)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [order_id, o.door_h, o.door_w, o.wall_thick, finalDoorH, finalDoorW, Number(mode) === 2 ? 2 : 1, handler || null]
+          (order_id, hole_height, hole_width, wall_thickness, door_height, door_width, mode, handler, remark_tags)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        [order_id, o.door_h, o.door_w, o.wall_thick, finalDoorH, finalDoorW, Number(mode) === 2 ? 2 : 1, handler || null, remark_tags || null]
       );
       ok(res, { id: r.insertId }, '下料单已生成');
     } catch (e) {
@@ -113,7 +113,7 @@ router.post(
 router.put(
   '/:id',
   wrap(async (req, res) => {
-    const { door_height, door_width, status, cut_date, handler } = req.body;
+    const { door_height, door_width, status, cut_date, handler, remark_tags } = req.body;
     const [rows] = await pool.query('SELECT * FROM cutting_list WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return fail(res, '下料单不存在');
     const cl = rows[0];
@@ -127,14 +127,18 @@ router.put(
       finalStatus = '待下料';
     }
 
+    // remark_tags：undefined=不动；null/数组=写库（前端传 stringify 字符串数组）
+    const finalTags = remark_tags === undefined ? cl.remark_tags : remark_tags || null;
+
     await pool.query(
-      `UPDATE cutting_list SET door_height=?, door_width=?, status=?, cut_date=?, handler=? WHERE id=?`,
+      `UPDATE cutting_list SET door_height=?, door_width=?, status=?, cut_date=?, handler=?, remark_tags=? WHERE id=?`,
       [
         door_height != null ? Number(door_height) : cl.door_height,
         door_width != null ? Number(door_width) : cl.door_width,
         finalStatus,
         cut_date || cl.cut_date,
         handler || cl.handler,
+        finalTags,
         req.params.id,
       ]
     );
