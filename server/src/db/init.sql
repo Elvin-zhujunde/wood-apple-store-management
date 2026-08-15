@@ -1,6 +1,8 @@
--- 木门加工企业库存与订单管理系统 - 数据库初始化脚本
+-- 木门加工企业库存与订单管理系统 - 数据库表结构（schema 参考）
 -- 数据库: wood_store
 -- 字符集: utf8mb4
+-- 说明: 本文件为表结构参考，供开发/AI 查看字段定义；生产数据通过 .sql 导入恢复，
+--       请勿用此文件初始化生产库（用 CREATE TABLE IF NOT EXISTS，重复执行不破坏数据）。
 
 CREATE DATABASE IF NOT EXISTS wood_store DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE wood_store;
@@ -8,8 +10,7 @@ USE wood_store;
 -- ============================================================
 -- 1. 用户表
 -- ============================================================
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   username      VARCHAR(50)  NOT NULL UNIQUE COMMENT '登录账号',
   password_hash VARCHAR(255) NOT NULL COMMENT 'bcrypt 哈希',
@@ -21,8 +22,7 @@ CREATE TABLE users (
 -- ============================================================
 -- 2. 物料档案表
 -- ============================================================
-DROP TABLE IF EXISTS materials;
-CREATE TABLE materials (
+CREATE TABLE IF NOT EXISTS materials (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   code          VARCHAR(20)  NOT NULL UNIQUE COMMENT '物料编码 CL-001',
   name          VARCHAR(50)  NOT NULL COMMENT '物料名称',
@@ -37,8 +37,7 @@ CREATE TABLE materials (
 -- ============================================================
 -- 3. 门型BOM配方主表
 -- ============================================================
-DROP TABLE IF EXISTS door_bom;
-CREATE TABLE door_bom (
+CREATE TABLE IF NOT EXISTS door_bom (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   code          VARCHAR(20)  NOT NULL UNIQUE COMMENT '门型编号 M-101',
   name          VARCHAR(50)  NOT NULL COMMENT '门型名称',
@@ -51,8 +50,7 @@ CREATE TABLE door_bom (
 -- ============================================================
 -- 4. BOM 明细表
 -- ============================================================
-DROP TABLE IF EXISTS door_bom_items;
-CREATE TABLE door_bom_items (
+CREATE TABLE IF NOT EXISTS door_bom_items (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   bom_id       INT NOT NULL COMMENT '门型BOM id',
   material_id  INT NOT NULL COMMENT '物料id',
@@ -65,8 +63,7 @@ CREATE TABLE door_bom_items (
 -- ============================================================
 -- 5. 销售订单表
 -- ============================================================
-DROP TABLE IF EXISTS sales_orders;
-CREATE TABLE sales_orders (
+CREATE TABLE IF NOT EXISTS sales_orders (
   id                 INT AUTO_INCREMENT PRIMARY KEY,
   order_no           VARCHAR(30)  NOT NULL UNIQUE COMMENT 'SO-YYYYMMDD-NNN',
   customer           VARCHAR(100) NOT NULL COMMENT '客户名称/项目地址',
@@ -89,6 +86,18 @@ CREATE TABLE sales_orders (
   wall_thick         DECIMAL(8,2) NULL COMMENT '墙厚(mm)',
   style              VARCHAR(50)  NULL COMMENT '款式编号',
   board              VARCHAR(50)  NULL COMMENT '板材',
+  -- 台账对齐字段（甲方修改建议2，ARE-105）
+  remark             VARCHAR(500) NULL COMMENT '备注(加急/颜色定制/客户交代)',
+  paid_amount        DECIMAL(12,2) NULL COMMENT '已付金额(累计已付,欠款=total_amount-paid_amount)',
+  edge_band          DECIMAL(6,2) NULL COMMENT '包边(mm)',
+  frame_line         VARCHAR(100) NULL COMMENT '套板线条(如 2公分碳素门套碳素线条)',
+  customer_type      VARCHAR(50)  NULL COMMENT '客户类别(经销商/直销)',
+  address            VARCHAR(200) NULL COMMENT '地址',
+  hardware           VARCHAR(100) NULL COMMENT '五金配件备注',
+  pay_method         VARCHAR(20)  NULL COMMENT '付款方式(扫码/现金/转账/赊账)',
+  salesperson        VARCHAR(50)  NULL COMMENT '业务员',
+  installer          VARCHAR(50)  NULL COMMENT '安装师傅',
+  biz_fee            DECIMAL(10,2) NULL COMMENT '业务费',
   status             ENUM('新建','已发货','已收款') NOT NULL DEFAULT '新建',
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_bom FOREIGN KEY (door_bom_id) REFERENCES door_bom(id)
@@ -97,8 +106,7 @@ CREATE TABLE sales_orders (
 -- ============================================================
 -- 6. 采购入库单表
 -- ============================================================
-DROP TABLE IF EXISTS purchase_inbound;
-CREATE TABLE purchase_inbound (
+CREATE TABLE IF NOT EXISTS purchase_inbound (
   id                INT AUTO_INCREMENT PRIMARY KEY,
   inbound_no        VARCHAR(30)   NOT NULL UNIQUE COMMENT 'RK-YYYYMMDD-NNN',
   material_id       INT           NOT NULL,
@@ -118,8 +126,7 @@ CREATE TABLE purchase_inbound (
 -- ============================================================
 -- 7. 生产领料单表
 -- ============================================================
-DROP TABLE IF EXISTS material_requisition;
-CREATE TABLE material_requisition (
+CREATE TABLE IF NOT EXISTS material_requisition (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   req_no     VARCHAR(30)   NOT NULL UNIQUE COMMENT 'LL-YYYYMMDD-NNN',
   order_id   INT           NOT NULL COMMENT '关联销售订单',
@@ -135,8 +142,7 @@ CREATE TABLE material_requisition (
 -- ============================================================
 -- 8. 库存变动流水表
 -- ============================================================
-DROP TABLE IF EXISTS inventory_log;
-CREATE TABLE inventory_log (
+CREATE TABLE IF NOT EXISTS inventory_log (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   material_id INT           NOT NULL,
   change_type ENUM('in','out') NOT NULL COMMENT '入库/出库',
@@ -150,8 +156,7 @@ CREATE TABLE inventory_log (
 -- ============================================================
 -- 9. 采购建议表
 -- ============================================================
-DROP TABLE IF EXISTS purchase_suggestion;
-CREATE TABLE purchase_suggestion (
+CREATE TABLE IF NOT EXISTS purchase_suggestion (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   material_id INT           NOT NULL,
   suggest_qty DECIMAL(14,3) NOT NULL COMMENT '建议采购数量',
@@ -178,13 +183,3 @@ CREATE TABLE IF NOT EXISTS attachments (
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_entity (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务图片附件';
-
--- ============================================================
--- 种子数据:门型BOM(2026年木果订单 Excel 实际门型code)
--- MG=厂做木门 YX=永旭系列 FS=福顺系列(Excel历史订单仅此三种门型)
--- ============================================================
-INSERT INTO door_bom (code,name,standard_size,colors,nonstd_markup) VALUES
-  ('M-101','现代极简平板门','2100x900x240','默认',0),
-  ('MG','厂做木门','按订单','按款式',0),
-  ('YX','永旭系列门','按订单','烟雨江南2号,湖光秋月,似水年华',0),
-  ('FS','福顺系列门','按订单','秋水胡桃,奶茶灰',0);

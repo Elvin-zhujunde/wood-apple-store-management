@@ -23,10 +23,26 @@
       <el-table-column type="selection" width="42" />
       <el-table-column prop="order_no" label="订单号" width="160" />
       <el-table-column prop="customer" label="客户" min-width="120" />
+      <el-table-column label="尺寸(高×宽)" width="130">
+        <template #default="{ row }">
+          <span v-if="row.door_h || row.door_w">{{ row.door_h || '-' }}×{{ row.door_w || '-' }}</span>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="door_bom_name" label="门型" width="120" />
       <el-table-column prop="color" label="颜色" width="80" />
       <el-table-column prop="qty" label="数量(樘)" width="90" align="right" />
-      <el-table-column prop="total_amount" label="总金额" width="100" align="right" />
+      <el-table-column label="应收" width="90" align="right" prop="total_amount" />
+      <el-table-column label="已收" width="90" align="right">
+        <template #default="{ row }">{{ row.paid_amount != null ? row.paid_amount : '-' }}</template>
+      </el-table-column>
+      <el-table-column label="欠款" width="90" align="right">
+        <template #default="{ row }">
+          <span v-if="balanceOf(row) > 0" style="color:#f56c6c;font-weight:600">{{ balanceOf(row) }}</span>
+          <span v-else-if="row.paid_amount != null" style="color:#67c23a">0</span>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="handler_sale" label="经手人" width="80" />
       <el-table-column prop="order_date" label="下单日" width="120" :formatter="dateFmt" />
       <el-table-column prop="actual_ship_date" label="发货日" width="120" :formatter="dateFmt" />
@@ -82,10 +98,22 @@
         订单 <strong>{{ payRow?.order_no }}</strong> · {{ payRow?.customer }}
       </el-alert>
       <el-form :model="payForm" label-width="100px">
+        <el-form-item label="应收金额">
+          <el-input :model-value="payRow?.total_amount" disabled />
+        </el-form-item>
+        <el-form-item label="已付金额" required>
+          <el-input-number v-model="payForm.paid_amount" :min="0" :precision="2" controls-position="right" style="width:100%" />
+          <div class="muted">默认应收额=全额结清；填少于应收=赊账，欠款={{ payBalance }}</div>
+        </el-form-item>
+        <el-form-item label="付款方式">
+          <el-select v-model="payForm.pay_method" clearable style="width:100%">
+            <el-option label="扫码" value="扫码" /><el-option label="现金" value="现金" /><el-option label="转账" value="转账" /><el-option label="赊账" value="赊账" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="收款日期" required>
           <el-date-picker v-model="payForm.pay_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
         </el-form-item>
-        <el-form-item label="收据单号" required>
+        <el-form-item label="收据单号">
           <el-input v-model="payForm.receipt_no" />
         </el-form-item>
         <el-form-item label="收款经手人">
@@ -134,6 +162,12 @@
         <el-form-item label="收据单号" required>
           <el-input v-model="batchPayForm.receipt_no" placeholder="同一批次共用一个收据单号" />
         </el-form-item>
+        <el-form-item label="付款方式">
+          <el-select v-model="batchPayForm.pay_method" clearable style="width:100%">
+            <el-option label="扫码" value="扫码" /><el-option label="现金" value="现金" /><el-option label="转账" value="转账" /><el-option label="赊账" value="赊账" />
+          </el-select>
+          <div class="muted">批量默认全额结清；部分付款/赊账请逐单操作</div>
+        </el-form-item>
         <el-form-item label="收款经手人">
           <el-input v-model="batchPayForm.handler_finance" />
         </el-form-item>
@@ -174,6 +208,21 @@
                   <el-input :model-value="bomSpec" disabled placeholder="由门型带出" />
                 </el-form-item>
               </el-col>
+              <el-col :span="8">
+                <el-form-item label="门洞高"><el-input-number v-model="form.door_h" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="mm" /></el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="门洞宽"><el-input-number v-model="form.door_w" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="mm" /></el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="墙厚"><el-input-number v-model="form.wall_thick" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="mm" /></el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="款式"><el-input v-model="form.style" placeholder="如 1016 / XF-2471" /></el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="门扇板材"><el-input v-model="form.board" placeholder="如 3号 / 5号" /></el-form-item>
+              </el-col>
               <el-col :span="12">
                 <el-form-item label="数量(樘)" required><el-input-number v-model="form.qty" :min="1" style="width:100%" /></el-form-item>
               </el-col>
@@ -189,6 +238,24 @@
               <el-col :span="12">
                 <el-form-item label="约定发货日"><el-date-picker v-model="form.expected_ship_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
               </el-col>
+              <el-col :span="24">
+                <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" placeholder="加急/颜色定制/包安装/客户交代等" /></el-form-item>
+              </el-col>
+              <!-- 可选信息（默认收起，降低录入负担） -->
+              <el-col :span="24">
+                <el-collapse>
+                  <el-collapse-item title="可选信息（客户类别/地址/包边/套板线条/五金/业务员）" name="opt">
+                    <el-row :gutter="12">
+                      <el-col :span="12"><el-form-item label="客户类别"><el-select v-model="form.customer_type" clearable style="width:100%"><el-option label="经销商" value="经销商" /><el-option label="直销" value="直销" /></el-select></el-form-item></el-col>
+                      <el-col :span="12"><el-form-item label="地址"><el-input v-model="form.address" /></el-form-item></el-col>
+                      <el-col :span="12"><el-form-item label="包边(mm)"><el-input-number v-model="form.edge_band" :min="0" :precision="2" controls-position="right" style="width:100%" /></el-form-item></el-col>
+                      <el-col :span="12"><el-form-item label="套板线条"><el-input v-model="form.frame_line" /></el-form-item></el-col>
+                      <el-col :span="12"><el-form-item label="五金"><el-input v-model="form.hardware" /></el-form-item></el-col>
+                      <el-col :span="12"><el-form-item label="业务员"><el-input v-model="form.salesperson" /></el-form-item></el-col>
+                    </el-row>
+                  </el-collapse-item>
+                </el-collapse>
+              </el-col>
             </el-row>
           </el-form>
         </el-tab-pane>
@@ -203,6 +270,22 @@
 
         <el-tab-pane v-if="isEdit" label="收款回填" name="pay">
           <el-form :model="form" label-width="110px">
+            <el-form-item label="应收款">
+              <el-input :model-value="form.total_amount" disabled />
+              <div class="muted">订单总金额（自动）</div>
+            </el-form-item>
+            <el-form-item label="已付金额">
+              <el-input-number v-model="form.paid_amount" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="默认填应收额=全额结清，填少于应收=赊账欠款" />
+            </el-form-item>
+            <el-form-item label="欠款">
+              <el-input :model-value="balanceDue" disabled :class="{ 'balance-over': balanceDue > 0 }" />
+              <div class="muted">= 应收 − 已付，欠款&gt;0 为未结清</div>
+            </el-form-item>
+            <el-form-item label="付款方式">
+              <el-select v-model="form.pay_method" clearable style="width:100%">
+                <el-option label="扫码" value="扫码" /><el-option label="现金" value="现金" /><el-option label="转账" value="转账" /><el-option label="赊账" value="赊账" />
+              </el-select>
+            </el-form-item>
             <el-form-item label="收款日期"><el-date-picker v-model="form.pay_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
             <el-form-item label="收据单号"><el-input v-model="form.receipt_no" /></el-form-item>
             <el-form-item label="收款经手人"><el-input v-model="form.handler_finance" /></el-form-item>
@@ -270,6 +353,21 @@ const bomSpec = computed(() => {
   return bom?.standard_size || ''
 })
 
+// 欠款计算（决策2：已付 paid_amount，欠款=应收-已付）
+// 表单内实时欠款（收款tab用）
+const balanceDue = computed(() => {
+  const total = Number(form.value.total_amount) || 0
+  const paid = Number(form.value.paid_amount) || 0
+  return Math.round((total - paid) * 100) / 100
+})
+// 列表行欠款（R7）
+function balanceOf(row) {
+  if (row.paid_amount == null) return 0
+  const total = Number(row.total_amount) || 0
+  const paid = Number(row.paid_amount) || 0
+  return Math.round((total - paid) * 100) / 100
+}
+
 function statusType(s) {
   return { 新建: 'info', 已发货: 'warning', 已收款: 'success' }[s] || 'info'
 }
@@ -298,7 +396,7 @@ async function onBatchShip() {
 }
 
 function openBatchPay() {
-  batchPayForm.value = { pay_date: today(), receipt_no: '', handler_finance: store.name }
+  batchPayForm.value = { pay_date: today(), receipt_no: '', pay_method: '', handler_finance: store.name }
   batchPayVisible.value = true
 }
 
@@ -342,6 +440,8 @@ function openAdd() {
     customer: '', door_bom_id: '', color: '', qty: 1, unit_price: 0,
     handler_sale: store.name, order_date: today(),
     expected_ship_date: '',
+    door_h: null, door_w: null, wall_thick: null, style: '', board: '',
+    remark: '', edge_band: null, frame_line: '', customer_type: '', address: '',
   }
   dlgVisible.value = true
 }
@@ -413,10 +513,12 @@ async function onShip() {
   load()
 }
 
-// 行内收款
+// 行内收款（决策2：支持部分付款，已付默认=应收额，可改少于应收=赊账）
 function openPay(row) {
   payRow.value = row
   payForm.value = {
+    paid_amount: Number(row.total_amount) || 0,  // 默认全额
+    pay_method: '',
     pay_date: today(),
     receipt_no: '',
     handler_finance: store.name,
@@ -424,15 +526,24 @@ function openPay(row) {
   payVisible.value = true
 }
 
+// 行内收款弹窗实时欠款
+const payBalance = computed(() => {
+  const total = Number(payRow.value?.total_amount) || 0
+  const paid = Number(payForm.value.paid_amount) || 0
+  return Math.round((total - paid) * 100) / 100
+})
+
 async function onPay() {
   const f = payForm.value
-  if (!f.pay_date || !f.receipt_no) return ElMessage.warning('请填收款日与收据单号')
+  if (!f.pay_date) return ElMessage.warning('请填收款日期')
+  if (f.paid_amount == null || Number(f.paid_amount) <= 0) return ElMessage.warning('请填已付金额')
   const r = payRow.value
   await orderApi.update(r.id, {
     customer: r.customer, door_bom_id: r.door_bom_id, color: r.color,
     qty: r.qty, unit_price: r.unit_price, expected_ship_date: r.expected_ship_date,
     actual_ship_date: r.actual_ship_date, ship_no: r.ship_no, handler_ship: r.handler_ship,
     pay_date: f.pay_date, receipt_no: f.receipt_no, handler_finance: f.handler_finance,
+    paid_amount: f.paid_amount, pay_method: f.pay_method,
   })
   ElMessage.success('已收款，状态已更新')
   payVisible.value = false
@@ -450,6 +561,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.muted { color: #909399; font-size: 12px; }
+/* 欠款>0 输入框标红提示 */
+:deep(.balance-over .el-input__inner) { color: #f56c6c; font-weight: 600; }
 /* 移动端：行内操作按钮放大到手指好点 */
 @media (max-width: 768px) {
   .row-btn { min-height: 44px; padding: 0 12px; }

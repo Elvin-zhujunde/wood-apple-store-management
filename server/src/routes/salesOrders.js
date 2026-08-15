@@ -84,18 +84,20 @@ router.put(
 
 // 批量收款：勾选的"新建/已发货"订单统一填收款日/收据号/经手人 → 批量转"已收款"
 // 兼容预付款(新建直接收款)与发货后收款(已发货)两种场景
+// 决策2：批量默认全额结清（paid_amount=total_amount）；部分付款需逐单操作（多单金额不同无法统一）
 router.put(
   '/batch/pay',
   wrap(async (req, res) => {
-    const { ids, pay_date, receipt_no, handler_finance } = req.body;
+    const { ids, pay_date, receipt_no, handler_finance, pay_method } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) return fail(res, '请选择订单');
     if (!pay_date || !receipt_no || !handler_finance) return fail(res, '收款日期/收据单号/收款经手人 必填');
     const date = String(pay_date).slice(0, 10);
+    // paid_amount=total_amount：批量默认全额结清（每单金额不同，用子查询取各自应收额）
     const [r] = await pool.query(
       `UPDATE sales_orders
-        SET pay_date=?, receipt_no=?, handler_finance=?, status='已收款'
+        SET pay_date=?, receipt_no=?, handler_finance=?, pay_method=?, paid_amount=total_amount, status='已收款'
        WHERE id IN (?) AND status IN ('新建','已发货')`,
-      [date, receipt_no, handler_finance, ids]
+      [date, receipt_no, handler_finance, pay_method || null, ids]
     );
     const skipped = ids.length - r.affectedRows;
     ok(res, { success: r.affectedRows, skipped }, `批量收款完成：${r.affectedRows} 单成功${skipped ? `，${skipped} 单已收款已跳过` : ''}`);
@@ -124,6 +126,9 @@ router.post(
     const {
       customer, door_bom_id, color, qty, unit_price,
       handler_sale, order_date, expected_ship_date,
+      // 台账对齐字段（ARE-105，开单时录入）
+      door_h, door_w, wall_thick, style, board,
+      remark, edge_band, frame_line, customer_type, address,
     } = req.body;
     if (!customer || !door_bom_id || !color || !qty || !unit_price || !handler_sale || !order_date)
       return fail(res, '客户/门型/颜色/数量/单价/经手人/下单日期 必填');
@@ -134,10 +139,14 @@ router.post(
     const [r] = await pool.query(
       `INSERT INTO sales_orders
         (order_no, customer, door_bom_id, color, qty, unit_price, total_amount,
-         handler_sale, order_date, expected_ship_date, status)
-       VALUES (?,?,?,?,?,?,?,?,?,?, '新建')`,
+         handler_sale, order_date, expected_ship_date, status,
+         door_h, door_w, wall_thick, style, board,
+         remark, edge_band, frame_line, customer_type, address)
+       VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?)`,
       [order_no, customer, door_bom_id, color, qty, unit_price, total_amount,
-       handler_sale, order_date, expected_ship_date || null]
+       handler_sale, order_date, expected_ship_date || null,
+       door_h || null, door_w || null, wall_thick || null, style || null, board || null,
+       remark || null, edge_band || null, frame_line || null, customer_type || null, address || null]
     );
 
     // 触发采购建议生成（核心）
@@ -161,6 +170,11 @@ router.put(
       expected_ship_date,
       actual_ship_date, ship_no, handler_ship,
       pay_date, receipt_no, handler_finance,
+      // 台账对齐字段（ARE-105）
+      door_h, door_w, wall_thick, style, board,
+      remark, paid_amount, edge_band, frame_line,
+      customer_type, address, hardware, pay_method,
+      salesperson, installer, biz_fee,
     } = req.body;
 
     // 日期归一：兼容 'YYYY-MM-DD' 与 ISO 'YYYY-MM-DDTHH:mm:ss.sssZ' 两种格式
@@ -171,10 +185,13 @@ router.put(
       return s.length >= 10 ? s.slice(0, 10) : s;
     };
 
-    // 状态自动流转
+    // 状态自动流转（决策2：支持部分付款——paid_amount>0 即视为有收款记录）
     let status = '新建';
-    if (pay_date && receipt_no) status = '已收款';
-    else if (actual_ship_date && ship_no) status = '已发货';
+    if (pay_date && (paid_amount !== undefined && paid_amount !== null && Number(paid_amount) > 0)) {
+      status = '已收款';
+    } else if (actual_ship_date && ship_no) {
+      status = '已发货';
+    }
 
     const total_amount = qty ? qty * Number(unit_price) : undefined;
 
@@ -183,13 +200,21 @@ router.put(
         customer=?, door_bom_id=?, color=?, qty=?, unit_price=?, total_amount=?,
         expected_ship_date=?,
         actual_ship_date=?, ship_no=?, handler_ship=?,
-        pay_date=?, receipt_no=?, handler_finance=?,
+        pay_date=?, receipt_no=?, handler_finance=?, paid_amount=?,
+        door_h=?, door_w=?, wall_thick=?, style=?, board=?,
+        remark=?, edge_band=?, frame_line=?,
+        customer_type=?, address=?, hardware=?, pay_method=?,
+        salesperson=?, installer=?, biz_fee=?,
         status=?
        WHERE id=?`,
       [customer, door_bom_id, color, qty, unit_price, total_amount,
        normDate(expected_ship_date),
        normDate(actual_ship_date), ship_no || null, handler_ship || null,
-       normDate(pay_date), receipt_no || null, handler_finance || null,
+       normDate(pay_date), receipt_no || null, handler_finance || null, paid_amount || null,
+       door_h || null, door_w || null, wall_thick || null, style || null, board || null,
+       remark || null, edge_band || null, frame_line || null,
+       customer_type || null, address || null, hardware || null, pay_method || null,
+       salesperson || null, installer || null, biz_fee || null,
        status, req.params.id]
     );
     ok(res, { status }, '更新成功');
