@@ -31,7 +31,6 @@
       </el-table-column>
       <el-table-column prop="door_bom_name" label="门型" width="120" />
       <el-table-column prop="color" label="颜色" width="80" />
-      <el-table-column prop="qty" label="数量(樘)" width="90" align="right" />
       <el-table-column label="应收" width="90" align="right" prop="total_amount" />
       <el-table-column label="已收" width="90" align="right">
         <template #default="{ row }">{{ row.paid_amount != null ? row.paid_amount : '-' }}</template>
@@ -224,9 +223,6 @@
                 <el-form-item label="门扇板材"><el-input v-model="form.board" placeholder="如 3号 / 5号" /></el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="数量(樘)" required><el-input-number v-model="form.qty" :min="1" style="width:100%" /></el-form-item>
-              </el-col>
-              <el-col :span="12">
                 <el-form-item label="销售单价" required><el-input-number v-model="form.unit_price" :min="0" :precision="2" style="width:100%" /></el-form-item>
               </el-col>
               <el-col :span="12">
@@ -234,9 +230,6 @@
               </el-col>
               <el-col :span="12">
                 <el-form-item label="下单日期" required><el-date-picker v-model="form.order_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="约定发货日"><el-date-picker v-model="form.expected_ship_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
               </el-col>
               <el-col :span="24">
                 <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" placeholder="加急/颜色定制/包安装/客户交代等" /></el-form-item>
@@ -439,7 +432,6 @@ function openAdd() {
   form.value = {
     customer: '', door_bom_id: '', color: '', qty: 1, unit_price: 0,
     handler_sale: store.name, order_date: today(),
-    expected_ship_date: '',
     door_h: null, door_w: null, wall_thick: null, style: '', board: '',
     remark: '', edge_band: null, frame_line: '', customer_type: '', address: '',
   }
@@ -504,7 +496,7 @@ async function onShip() {
   // 复用 PUT，带上订单原有字段 + 发货字段，触发状态流转
   await orderApi.update(r.id, {
     customer: r.customer, door_bom_id: r.door_bom_id, color: r.color,
-    qty: r.qty, unit_price: r.unit_price, expected_ship_date: r.expected_ship_date,
+    qty: r.qty, unit_price: r.unit_price,
     actual_ship_date: f.actual_ship_date, ship_no: f.ship_no, handler_ship: f.handler_ship,
     pay_date: null, receipt_no: null, handler_finance: null,
   })
@@ -540,7 +532,7 @@ async function onPay() {
   const r = payRow.value
   await orderApi.update(r.id, {
     customer: r.customer, door_bom_id: r.door_bom_id, color: r.color,
-    qty: r.qty, unit_price: r.unit_price, expected_ship_date: r.expected_ship_date,
+    qty: r.qty, unit_price: r.unit_price,
     actual_ship_date: r.actual_ship_date, ship_no: r.ship_no, handler_ship: r.handler_ship,
     pay_date: f.pay_date, receipt_no: f.receipt_no, handler_finance: f.handler_finance,
     paid_amount: f.paid_amount, pay_method: f.pay_method,

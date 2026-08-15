@@ -125,7 +125,7 @@ router.post(
   wrap(async (req, res) => {
     const {
       customer, door_bom_id, color, qty, unit_price,
-      handler_sale, order_date, expected_ship_date,
+      handler_sale, order_date,
       // 台账对齐字段（ARE-105，开单时录入）
       door_h, door_w, wall_thick, style, board,
       remark, edge_band, frame_line, customer_type, address,
@@ -136,15 +136,16 @@ router.post(
     const order_no = await genDocNo('sales_orders', 'SO', 'order');
     const total_amount = qty * Number(unit_price);
 
+    // R4(ARE-107)：删除"约定发货日"录入，expected_ship_date 不再接收（DB字段保留给历史数据）
     const [r] = await pool.query(
       `INSERT INTO sales_orders
         (order_no, customer, door_bom_id, color, qty, unit_price, total_amount,
-         handler_sale, order_date, expected_ship_date, status,
+         handler_sale, order_date, status,
          door_h, door_w, wall_thick, style, board,
          remark, edge_band, frame_line, customer_type, address)
-       VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?)`,
       [order_no, customer, door_bom_id, color, qty, unit_price, total_amount,
-       handler_sale, order_date, expected_ship_date || null,
+       handler_sale, order_date,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
        remark || null, edge_band || null, frame_line || null, customer_type || null, address || null]
     );
@@ -167,7 +168,6 @@ router.put(
   wrap(async (req, res) => {
     const {
       customer, door_bom_id, color, qty, unit_price,
-      expected_ship_date,
       actual_ship_date, ship_no, handler_ship,
       pay_date, receipt_no, handler_finance,
       // 台账对齐字段（ARE-105）
@@ -198,7 +198,6 @@ router.put(
     await pool.query(
       `UPDATE sales_orders SET
         customer=?, door_bom_id=?, color=?, qty=?, unit_price=?, total_amount=?,
-        expected_ship_date=?,
         actual_ship_date=?, ship_no=?, handler_ship=?,
         pay_date=?, receipt_no=?, handler_finance=?, paid_amount=?,
         door_h=?, door_w=?, wall_thick=?, style=?, board=?,
@@ -208,7 +207,6 @@ router.put(
         status=?
        WHERE id=?`,
       [customer, door_bom_id, color, qty, unit_price, total_amount,
-       normDate(expected_ship_date),
        normDate(actual_ship_date), ship_no || null, handler_ship || null,
        normDate(pay_date), receipt_no || null, handler_finance || null, paid_amount || null,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
