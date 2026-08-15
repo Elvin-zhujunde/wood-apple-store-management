@@ -112,7 +112,7 @@
           <el-input :model-value="payRow?.paid_amount" disabled />
           <div class="muted">本次填累计已付额；填到应收=结清，少于应收=继续赊账</div>
         </el-form-item>
-        <el-form-item label="本次已付" required>
+        <el-form-item label="更新已付" required>
           <el-input-number v-model="payForm.paid_amount" :min="0" :precision="2" controls-position="right" style="width:100%" />
           <div class="muted">默认填应收额=全额结清；填少于应收=赊账，欠款={{ payBalance }}</div>
         </el-form-item>
