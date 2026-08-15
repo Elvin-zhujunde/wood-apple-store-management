@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   salesperson        VARCHAR(50)  NULL COMMENT '业务员',
   installer          VARCHAR(50)  NULL COMMENT '安装师傅',
   biz_fee            DECIMAL(10,2) NULL COMMENT '业务费',
-  status             ENUM('新建','已发货','已收款') NOT NULL DEFAULT '新建',
+  status             ENUM('新建','已发货','赊账中','已收款') NOT NULL DEFAULT '新建' COMMENT '新建→已发货→赊账中(部分付款)→已收款(足额=已完成)',
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_bom FOREIGN KEY (door_bom_id) REFERENCES door_bom(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售订单';

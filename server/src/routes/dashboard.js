@@ -25,19 +25,19 @@ router.get(
        FROM sales_orders
        WHERE order_date >= DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 0 MONTH),'%Y-%m-01')`
     );
-    // 待发货金额、待收款金额
+    // 待发货金额、待收款金额（待收款含 已发货 + 赊账中：都未足额结清）
     const [pendingMoney] = await pool.query(
       `SELECT status,
               COALESCE(SUM(total_amount),0) AS amount,
               COALESCE(SUM(total_amount - paid_amount),0) AS unpaid
          FROM sales_orders
-        WHERE status IN ('新建','已发货')
+        WHERE status IN ('新建','已发货','赊账中')
         GROUP BY status`
     );
     let pendingShipAmount = 0, pendingPayAmount = 0;
     for (const r of pendingMoney) {
       if (r.status === '新建') pendingShipAmount = Number(r.amount);
-      if (r.status === '已发货') { pendingPayAmount = Number(r.unpaid); }
+      if (r.status === '已发货' || r.status === '赊账中') pendingPayAmount += Number(r.unpaid);
     }
     // 订单总数、待发货数、待收款数
     const [orderStat] = await pool.query(
@@ -53,7 +53,7 @@ router.get(
     );
 
     // --- 图表2：订单状态分布 ---
-    const statusMap = { '新建': 0, '已发货': 0, '已收款': 0 };
+    const statusMap = { '新建': 0, '已发货': 0, '赊账中': 0, '已收款': 0 };
     for (const r of orderStat) statusMap[r.status] = r.c;
 
     // --- 图表3：库存状态分布（同 inventory.js 口径）---
@@ -86,8 +86,8 @@ router.get(
         WHERE o.status = '新建' ORDER BY o.id DESC LIMIT 5`
     );
     const [pendingPay] = await pool.query(
-      `SELECT id, order_no, customer, total_amount, actual_ship_date
-         FROM sales_orders WHERE status = '已发货' ORDER BY id DESC LIMIT 5`
+      `SELECT id, order_no, customer, total_amount, paid_amount, actual_ship_date, pay_date, status
+         FROM sales_orders WHERE status IN ('已发货','赊账中') ORDER BY id DESC LIMIT 5`
     );
 
     ok(res, {
@@ -100,13 +100,14 @@ router.get(
         pendingPayAmount,
         orderCount: Object.values(statusMap).reduce((a, b) => a + b, 0),
         pendingShipCount: statusMap['新建'],
-        pendingPayCount: statusMap['已发货'],
+        pendingPayCount: statusMap['已发货'] + statusMap['赊账中'],
         shortageCount: low + critical,
       },
       salesTrend: trend.map((t) => ({ month: t.ym, sales: Number(t.sales), count: t.cnt })),
       orderStatus: [
         { name: '待发货(新建)', value: statusMap['新建'] },
         { name: '已发货待收款', value: statusMap['已发货'] },
+        { name: '赊账中', value: statusMap['赊账中'] },
         { name: '已收款', value: statusMap['已收款'] },
       ],
       inventoryStatus: [

@@ -30,8 +30,8 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="detailVisible" title="库存变动流水" width="780px">
-      <el-descriptions :column="3" border size="small" v-if="detail">
+    <el-dialog v-model="detailVisible" title="库存变动流水" width="960px" class="log-dialog">
+      <el-descriptions :column="3" border v-if="detail">
         <el-descriptions-item label="物料">{{ detail.name }}</el-descriptions-item>
         <el-descriptions-item label="当前库存">{{ detail.stock_qty }} {{ detail.unit }}</el-descriptions-item>
         <el-descriptions-item label="安全库存">{{ detail.safety_stock }} {{ detail.unit }}</el-descriptions-item>
@@ -45,7 +45,7 @@
         <el-date-picker v-model="logQuery.dateRange" type="daterange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DD" style="width:220px" @change="searchLogs" />
         <el-button type="primary" size="small" @click="searchLogs">查询</el-button>
       </div>
-      <el-table :data="detail?.logs || []" size="small" border style="margin-top:8px">
+      <el-table :data="detail?.logs || []" border style="margin-top:8px">
         <el-table-column prop="created_at" label="时间" width="170" :formatter="dateTimeFmt" />
         <el-table-column label="类型" width="80">
           <template #default="{ row }">
@@ -124,3 +124,8 @@ function searchLogs() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+/* 流水弹窗放大：body 限高滚动，避免长流水撑出视口 */
+:deep(.log-dialog .el-dialog__body) { max-height: 72vh; overflow-y: auto; }
+</style>

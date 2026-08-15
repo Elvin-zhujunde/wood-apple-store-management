@@ -10,6 +10,7 @@
       <el-select v-model="query.status" placeholder="状态" clearable style="width:110px" @change="load">
         <el-option label="新建" value="新建" />
         <el-option label="已发货" value="已发货" />
+        <el-option label="赊账中" value="赊账中" />
         <el-option label="已收款" value="已收款" />
       </el-select>
       <el-date-picker v-model="query.dateRange" type="daterange" range-separator="至" start-placeholder="下单开始" end-placeholder="下单结束" value-format="YYYY-MM-DD" style="width:240px" @change="load" />
@@ -51,10 +52,16 @@
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="账龄" width="80" align="center">
+        <template #default="{ row }">
+          <span v-if="agingOf(row) != null" :style="agingStyle(agingOf(row))">{{ agingOf(row) }}天</span>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === '新建'" link type="primary" class="row-btn" @click="openShip(row)">发货</el-button>
-          <el-button v-if="row.status === '已发货'" link type="success" class="row-btn" @click="openPay(row)">收款</el-button>
+          <el-button v-if="row.status === '已发货' || row.status === '赊账中'" link type="success" class="row-btn" @click="openPay(row)">{{ row.status === '赊账中' ? '收尾款' : '收款' }}</el-button>
           <el-button v-if="row.status === '已收款'" link disabled class="row-btn">已完成</el-button>
           <el-button link type="primary" @click="openEdit(row)">详情</el-button>
           <el-button link type="warning" @click="openCutting(row)">下料单</el-button>
@@ -101,9 +108,13 @@
         <el-form-item label="应收金额">
           <el-input :model-value="payRow?.total_amount" disabled />
         </el-form-item>
-        <el-form-item label="已付金额" required>
+        <el-form-item v-if="payRow?.paid_amount != null" label="已付金额">
+          <el-input :model-value="payRow?.paid_amount" disabled />
+          <div class="muted">本次填累计已付额；填到应收=结清，少于应收=继续赊账</div>
+        </el-form-item>
+        <el-form-item label="本次已付" required>
           <el-input-number v-model="payForm.paid_amount" :min="0" :precision="2" controls-position="right" style="width:100%" />
-          <div class="muted">默认应收额=全额结清；填少于应收=赊账，欠款={{ payBalance }}</div>
+          <div class="muted">默认填应收额=全额结清；填少于应收=赊账，欠款={{ payBalance }}</div>
         </el-form-item>
         <el-form-item label="付款方式">
           <el-select v-model="payForm.pay_method" clearable style="width:100%">
@@ -206,20 +217,7 @@
           </el-col>
         </el-row>
         <el-form-item label="加工备注">
-          <div class="tag-editor">
-            <el-tag v-for="(t, i) in cutForm.tags" :key="i" size="small" type="warning" closable @close="cutForm.tags.splice(i, 1)">{{ t }}</el-tag>
-            <el-autocomplete
-              v-model="cutTagInput"
-              :fetch-suggestions="queryCutTags"
-              placeholder="输入回车或选中追加"
-              size="small"
-              class="tag-input"
-              @select="addCutTag"
-              @keyup.enter="addCutTag"
-            >
-              <template #default="{ item }">{{ item.value }}</template>
-            </el-autocomplete>
-          </div>
+          <TagInput v-model="cutForm.tags" :suggestions="cutTagOptions" placeholder="输入标签，回车添加" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -358,6 +356,7 @@ import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 import ImageUpload from '../components/ImageUpload.vue'
+import TagInput from '../components/TagInput.vue'
 
 const store = useUserStore()
 const route = useRoute()
@@ -393,7 +392,6 @@ const batchPayForm = ref({})
 const cuttingVisible = ref(false)
 const cutRow = ref(null)
 const cutForm = ref({})
-const cutTagInput = ref('')
 const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 const cutTagOptions = ref([])
 
@@ -421,13 +419,32 @@ function balanceOf(row) {
   return Math.round((total - paid) * 100) / 100
 }
 
+// 账龄（天）：已发货按发货日、赊账中按上次收款日；>30红 >15橙
+function daysBetween(fromStr, toStr) {
+  if (!fromStr || !toStr) return null
+  const a = String(fromStr).slice(0, 10).split('-').map(Number)
+  const b = String(toStr).slice(0, 10).split('-').map(Number)
+  if (!a[0] || !b[0]) return null
+  return Math.floor((Date.UTC(b[0], b[1] - 1, b[2]) - Date.UTC(a[0], a[1] - 1, a[2])) / 86400000)
+}
+function agingOf(row) {
+  if (row.status === '已发货') return daysBetween(row.actual_ship_date, today())
+  if (row.status === '赊账中') return daysBetween(row.pay_date, today())
+  return null
+}
+function agingStyle(days) {
+  if (days > 30) return 'color:#f56c6c;font-weight:600'
+  if (days > 15) return 'color:#e6a23c;font-weight:600'
+  return 'color:#909399'
+}
+
 function statusType(s) {
-  return { 新建: 'info', 已发货: 'warning', 已收款: 'success' }[s] || 'info'
+  return { 新建: 'info', 已发货: 'warning', 赊账中: 'danger', 已收款: 'success' }[s] || 'info'
 }
 
 // 批量：选中行中可发货/可收款的数量（后端也会做幂等校验，此处用于按钮可用性与提示）
 const batchShipableCount = computed(() => selectedRows.value.filter((r) => r.status === '新建').length)
-const batchPayableCount = computed(() => selectedRows.value.filter((r) => r.status === '新建' || r.status === '已发货').length)
+const batchPayableCount = computed(() => selectedRows.value.filter((r) => r.status === '新建' || r.status === '已发货' || r.status === '赊账中').length)
 
 function onSelectionChange(rows) {
   selectedRows.value = rows
@@ -622,21 +639,7 @@ async function openCutting(row) {
     handler: store.name,
     tags: [],
   }
-  cutTagInput.value = ''
   cuttingVisible.value = true
-}
-
-function queryCutTags(queryString, cb) {
-  const results = queryString
-    ? cutTagOptions.value.filter((s) => s.includes(queryString)).map((s) => ({ value: s }))
-    : cutTagOptions.value.map((s) => ({ value: s }))
-  cb(results)
-}
-
-function addCutTag(item) {
-  const v = (item && typeof item === 'object' ? item.value : cutTagInput.value || '').trim()
-  if (v && !cutForm.value.tags.includes(v)) cutForm.value.tags.push(v)
-  cutTagInput.value = ''
 }
 
 async function onCutting() {
@@ -670,8 +673,6 @@ onMounted(async () => {
 
 <style scoped>
 .muted { color: #909399; font-size: 12px; }
-.tag-editor { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
-.tag-input { width: 160px; }
 /* 欠款>0 输入框标红提示 */
 :deep(.balance-over .el-input__inner) { color: #f56c6c; font-weight: 600; }
 /* 移动端：行内操作按钮放大到手指好点 */

@@ -34,7 +34,7 @@
       <el-table-column label="备注" min-width="120">
         <template #default="{ row }">
           <span v-if="parseTags(row.remark_tags).length" class="tag-row">
-            <el-tag v-for="(t, i) in parseTags(row.remark_tags)" :key="i" size="small" type="warning" class="tag-item">{{ t }}</el-tag>
+            <el-tag v-for="(t, i) in parseTags(row.remark_tags)" :key="i" size="small" :type="tagType(t)" class="tag-item">{{ t }}</el-tag>
           </span>
           <span v-else class="muted">{{ row.remark || '-' }}</span>
         </template>
@@ -108,20 +108,7 @@
           </el-col>
         </el-row>
         <el-form-item label="加工备注">
-          <div class="tag-editor">
-            <el-tag v-for="(t, i) in editForm.tags" :key="i" size="small" type="warning" closable class="tag-item" @close="editForm.tags.splice(i, 1)">{{ t }}</el-tag>
-            <el-autocomplete
-              v-model="editTagInput"
-              :fetch-suggestions="queryTags"
-              placeholder="输入回车或选中追加"
-              size="small"
-              class="tag-input"
-              @select="addEditTag"
-              @keyup.enter="addEditTag"
-            >
-              <template #default="{ item }">{{ item.value }}</template>
-            </el-autocomplete>
-          </div>
+          <TagInput v-model="editForm.tags" :suggestions="tagOptions" placeholder="输入标签，回车添加" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -153,8 +140,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { cuttingApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
+import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../store/user'
+import TagInput from '../components/TagInput.vue'
 
 const router = useRouter()
 const store = useUserStore()
@@ -168,7 +157,6 @@ const tagOptions = ref([]) // 加工备注标签联想库（全量去重，onMou
 const editVisible = ref(false)
 const editRow = ref(null)
 const editForm = ref({})
-const editTagInput = ref('')
 const doneVisible = ref(false)
 const doneRow = ref(null)
 const doneForm = ref({})
@@ -182,14 +170,6 @@ function parseTags(raw) {
   } catch {
     return []
   }
-}
-
-// 标签联想：本地过滤全量去重数组（@select 传 item 对象 / 回车传字符串，统一取 .value 或本身）
-function queryTags(queryString, cb) {
-  const results = queryString
-    ? tagOptions.value.filter((s) => s.includes(queryString)).map((s) => ({ value: s }))
-    : tagOptions.value.map((s) => ({ value: s }))
-  cb(results)
 }
 
 async function load() {
@@ -221,15 +201,7 @@ function openEdit(row) {
     handler: row.handler || store.name,
     tags: parseTags(row.remark_tags),
   }
-  editTagInput.value = ''
   editVisible.value = true
-}
-
-function addEditTag(item) {
-  // el-autocomplete @select 传 {value}，回车传事件对象；统一取文本
-  const v = (item && typeof item === 'object' ? item.value : editTagInput.value || '').trim()
-  if (v && !editForm.value.tags.includes(v)) editForm.value.tags.push(v)
-  editTagInput.value = ''
 }
 
 async function onEdit() {
@@ -290,6 +262,4 @@ onMounted(async () => {
 .size-cell .muted { display: block; }
 .tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .tag-item { margin: 0; }
-.tag-editor { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
-.tag-input { width: 160px; }
 </style>

@@ -39,7 +39,7 @@
 
           <div v-if="parseTags(row.remark_tags).length" class="tag-print-row">
             <span class="tag-print-label">加工备注</span>
-            <span class="print-tag" v-for="(t, i) in parseTags(row.remark_tags)" :key="i">{{ t }}</span>
+            <span class="print-tag" v-for="(t, i) in parseTags(row.remark_tags)" :key="i" :style="{ borderColor: tagHex(t), color: tagHex(t) }">{{ t }}</span>
           </div>
 
           <div class="size-box">
@@ -119,6 +119,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { cuttingApi } from '../api'
 import { fmtDate } from '../utils/date'
+import { tagHex } from '../utils/tagColor'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()

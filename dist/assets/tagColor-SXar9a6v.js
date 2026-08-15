@@ -1,0 +1,1 @@
+const a=["","success","warning","danger","info"],r=["#409eff","#67c23a","#e6a23c","#f56c6c","#909399"];function c(n){let e=0;for(let t=0;t<n.length;t++)e=e*31+n.charCodeAt(t)>>>0;return e%a.length}function o(n){return a[c(n)]}function s(n){return r[c(n)]}export{a as T,o as a,s as t};

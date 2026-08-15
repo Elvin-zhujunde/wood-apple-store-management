@@ -95,7 +95,7 @@ router.put(
     const [r] = await pool.query(
       `UPDATE sales_orders
         SET pay_date=?, receipt_no=?, handler_finance=?, pay_method=?, paid_amount=total_amount, status='已收款'
-       WHERE id IN (?) AND status IN ('新建','已发货')`,
+       WHERE id IN (?) AND status IN ('新建','已发货','赊账中')`,
       [date, receipt_no, handler_finance, pay_method || null, ids]
     );
     const skipped = ids.length - r.affectedRows;
@@ -177,10 +177,13 @@ router.put(
       return s.length >= 10 ? s.slice(0, 10) : s;
     };
 
-    // 状态自动流转（决策2：支持部分付款——paid_amount>0 即视为有收款记录）
+    // 状态自动流转（赊账中间态：部分付款=赊账中，足额=已收款）
+    // pay_date+paid>=total → 已收款(已完成)；pay_date+0<paid<total → 赊账中；仅发货 → 已发货；否则新建
+    const paid = (paid_amount !== undefined && paid_amount !== null) ? Number(paid_amount) : 0;
+    const total = qty ? qty * Number(unit_price) : 0;
     let status = '新建';
-    if (pay_date && (paid_amount !== undefined && paid_amount !== null && Number(paid_amount) > 0)) {
-      status = '已收款';
+    if (pay_date && paid > 0) {
+      status = paid >= total ? '已收款' : '赊账中';
     } else if (actual_ship_date && ship_no) {
       status = '已发货';
     }
