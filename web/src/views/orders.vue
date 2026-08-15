@@ -178,35 +178,47 @@
       </template>
     </el-dialog>
 
-    <!-- 生成下料单弹窗（ARE-111：普通自动扣尺/特殊手填） -->
-    <el-dialog v-model="cuttingVisible" title="生成下料单" width="520px" :close-on-click-modal="false">
-      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+    <!-- 生成下料单弹窗（门扇高宽给默认值=门洞−扣尺，可改） -->
+    <el-dialog v-model="cuttingVisible" title="生成下料单" width="620px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:16px">
         订单 <strong>{{ cutRow?.order_no }}</strong> · {{ cutRow?.customer }} · 门洞 {{ cutRow?.door_h }}×{{ cutRow?.door_w }}
         <span v-if="cutRow?.wall_thick"> · 墙厚 {{ cutRow?.wall_thick }}</span>
+        <span class="muted"> · 默认扣尺 高-{{ cutConfig.defaultHeightCut }} 宽-{{ cutConfig.defaultWidthCut }}</span>
       </el-alert>
-      <el-form :model="cutForm" label-width="100px">
-        <el-form-item label="下料方式" required>
-          <el-radio-group v-model="cutForm.mode">
-            <el-radio :value="1">普通（自动扣尺）</el-radio>
-            <el-radio :value="2">特殊（手动录入）</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="门扇高" required>
-          <el-input-number v-model="cutForm.door_height" :min="0" :precision="2" controls-position="right" style="width:100%" :disabled="cutForm.mode === 1" />
-          <div v-if="cutForm.mode === 1" class="muted">= 门洞高 {{ cutRow?.door_h }} − 默认 {{ cutConfig.defaultHeightCut }}（可切特殊模式手改）</div>
-          <div v-else class="muted">双开门/异型门手动录入门扇尺寸</div>
-        </el-form-item>
-        <el-form-item label="门扇宽" required>
-          <el-input-number v-model="cutForm.door_width" :min="0" :precision="2" controls-position="right" style="width:100%" :disabled="cutForm.mode === 1" />
-          <div v-if="cutForm.mode === 1" class="muted">= 门洞宽 {{ cutRow?.door_w }} − 默认 {{ cutConfig.defaultWidthCut }}</div>
-        </el-form-item>
-        <el-form-item label="经手人">
-          <el-input v-model="cutForm.handler" />
-        </el-form-item>
+      <el-form :model="cutForm" label-width="90px" label-position="right">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="门扇高" required>
+              <el-input-number v-model="cutForm.door_height" :min="0" :precision="2" controls-position="right" style="width:100%" />
+              <div class="muted">= 门洞高 {{ cutRow?.door_h }} − {{ cutConfig.defaultHeightCut }}（默认值，可改）</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门扇宽" required>
+              <el-input-number v-model="cutForm.door_width" :min="0" :precision="2" controls-position="right" style="width:100%" />
+              <div class="muted">= 门洞宽 {{ cutRow?.door_w }} − {{ cutConfig.defaultWidthCut }}</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="经手人">
+              <el-input v-model="cutForm.handler" />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="加工备注">
           <div class="tag-editor">
             <el-tag v-for="(t, i) in cutForm.tags" :key="i" size="small" type="warning" closable @close="cutForm.tags.splice(i, 1)">{{ t }}</el-tag>
-            <el-input v-model="cutTagInput" size="small" placeholder="输入回车追加" class="tag-input" @keyup.enter="addCutTag" />
+            <el-autocomplete
+              v-model="cutTagInput"
+              :fetch-suggestions="queryCutTags"
+              placeholder="输入回车或选中追加"
+              size="small"
+              class="tag-input"
+              @select="addCutTag"
+              @keyup.enter="addCutTag"
+            >
+              <template #default="{ item }">{{ item.value }}</template>
+            </el-autocomplete>
           </div>
         </el-form-item>
       </el-form>
@@ -383,6 +395,7 @@ const cutRow = ref(null)
 const cutForm = ref({})
 const cutTagInput = ref('')
 const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
+const cutTagOptions = ref([])
 
 const colorOptions = computed(() => {
   const bom = bomList.value.find((b) => b.id === form.value.door_bom_id)
@@ -589,7 +602,7 @@ async function onPay() {
   load()
 }
 
-// 生成下料单（ARE-111）：先查该订单是否已有下料单，有则跳查看，无则弹窗选模式
+// 生成下料单：先查该订单是否已有下料单，有则跳查看，无则弹窗（门扇高宽给默认值=门洞−扣尺，可改）
 async function openCutting(row) {
   try {
     const res = await cuttingApi.list({ order_no: row.order_no, pageSize: 1 })
@@ -604,7 +617,6 @@ async function openCutting(row) {
   }
   cutRow.value = row
   cutForm.value = {
-    mode: 1,
     door_height: Number(row.door_h) - Number(cutConfig.value.defaultHeightCut),
     door_width: Number(row.door_w) - Number(cutConfig.value.defaultWidthCut),
     handler: store.name,
@@ -614,21 +626,27 @@ async function openCutting(row) {
   cuttingVisible.value = true
 }
 
-function addCutTag() {
-  const v = cutTagInput.value.trim()
-  if (v) cutForm.value.tags.push(v)
+function queryCutTags(queryString, cb) {
+  const results = queryString
+    ? cutTagOptions.value.filter((s) => s.includes(queryString)).map((s) => ({ value: s }))
+    : cutTagOptions.value.map((s) => ({ value: s }))
+  cb(results)
+}
+
+function addCutTag(item) {
+  const v = (item && typeof item === 'object' ? item.value : cutTagInput.value || '').trim()
+  if (v && !cutForm.value.tags.includes(v)) cutForm.value.tags.push(v)
   cutTagInput.value = ''
 }
 
 async function onCutting() {
   const f = cutForm.value
   const r = cutRow.value
-  if (f.mode === 2 && (!f.door_height || !f.door_width)) {
-    return ElMessage.warning('特殊模式需手填门扇高/宽')
+  if (!f.door_height || !f.door_width) {
+    return ElMessage.warning('门扇高/宽必填')
   }
   await cuttingApi.create({
     order_id: r.id,
-    mode: f.mode,
     door_height: f.door_height,
     door_width: f.door_width,
     handler: f.handler,
@@ -641,6 +659,7 @@ async function onCutting() {
 onMounted(async () => {
   bomList.value = (await bomApi.all()).data
   cutConfig.value = (await cuttingApi.getConfig()).data
+  cutTagOptions.value = (await cuttingApi.getTags()).data || []
   // 工作台待办跳转带 status query，自动筛选
   if (route.query.status) {
     query.value.status = String(route.query.status)

@@ -66,7 +66,9 @@ export const cuttingApi = {
   detail: (id) => request.get('/cutting-list/' + id),
   create: (data) => request.post('/cutting-list', data),
   update: (id, data) => request.put('/cutting-list/' + id, data),
+  remove: (id) => request.delete('/cutting-list/' + id),
   getConfig: () => request.get('/cutting-list/config'),
+  getTags: () => request.get('/cutting-list/tags'),
 }
 
 // 业务图片附件

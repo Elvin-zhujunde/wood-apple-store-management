@@ -57,11 +57,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="cut_date" label="下料日" width="110" :formatter="dateFmt" />
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button v-if="row.status === '待下料'" link type="success" @click="openMarkDone(row)">标记已下料</el-button>
           <el-button link type="warning" @click="printSingle(row)">打印</el-button>
+          <el-button link type="danger" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -74,28 +75,52 @@
       @current-change="load"
     />
 
-    <!-- 编辑弹窗：改门扇尺寸 + 状态流转 -->
-    <el-dialog v-model="editVisible" title="编辑下料单" width="480px" :close-on-click-modal="false">
-      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+    <!-- 编辑弹窗：改门扇尺寸 + 加工备注标签 -->
+    <el-dialog v-model="editVisible" title="编辑下料单" width="640px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:16px">
         订单 <strong>{{ editRow?.order_no }}</strong> · {{ editRow?.customer }}
+        <span v-if="editRow?.style"> · 款式 {{ editRow?.style }}</span>
+        <span v-if="editRow?.board"> · 板材 {{ editRow?.board }}</span>
       </el-alert>
-      <el-form :model="editForm" label-width="100px">
-        <el-form-item label="门洞尺寸">
-          <el-input :model-value="`${editRow?.hole_height} × ${editRow?.hole_width}`" disabled />
-        </el-form-item>
-        <el-form-item label="门扇高" required>
-          <el-input-number v-model="editForm.door_height" :min="0" :precision="2" controls-position="right" style="width:100%" />
-        </el-form-item>
-        <el-form-item label="门扇宽" required>
-          <el-input-number v-model="editForm.door_width" :min="0" :precision="2" controls-position="right" style="width:100%" />
-        </el-form-item>
-        <el-form-item label="经手人">
-          <el-input v-model="editForm.handler" />
-        </el-form-item>
+      <el-form :model="editForm" label-width="90px" label-position="right">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="门洞高"><el-input :model-value="editRow?.hole_height" disabled /></el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门洞宽"><el-input :model-value="editRow?.hole_width" disabled /></el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门扇高" required>
+              <el-input-number v-model="editForm.door_height" :min="0" :precision="2" controls-position="right" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门扇宽" required>
+              <el-input-number v-model="editForm.door_width" :min="0" :precision="2" controls-position="right" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="墙厚"><el-input :model-value="editRow?.wall_thickness" disabled /></el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="经手人"><el-input v-model="editForm.handler" /></el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="加工备注">
           <div class="tag-editor">
             <el-tag v-for="(t, i) in editForm.tags" :key="i" size="small" type="warning" closable class="tag-item" @close="editForm.tags.splice(i, 1)">{{ t }}</el-tag>
-            <el-input v-model="editTagInput" size="small" placeholder="输入回车追加" class="tag-input" @keyup.enter="addEditTag" />
+            <el-autocomplete
+              v-model="editTagInput"
+              :fetch-suggestions="queryTags"
+              placeholder="输入回车或选中追加"
+              size="small"
+              class="tag-input"
+              @select="addEditTag"
+              @keyup.enter="addEditTag"
+            >
+              <template #default="{ item }">{{ item.value }}</template>
+            </el-autocomplete>
           </div>
         </el-form-item>
       </el-form>
@@ -128,7 +153,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { cuttingApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../store/user'
 
 const router = useRouter()
@@ -138,6 +163,7 @@ const list = ref([])
 const total = ref(0)
 const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 const selectedRows = ref([])
+const tagOptions = ref([]) // 加工备注标签联想库（全量去重，onMounted 拉一次）
 
 const editVisible = ref(false)
 const editRow = ref(null)
@@ -156,6 +182,14 @@ function parseTags(raw) {
   } catch {
     return []
   }
+}
+
+// 标签联想：本地过滤全量去重数组（@select 传 item 对象 / 回车传字符串，统一取 .value 或本身）
+function queryTags(queryString, cb) {
+  const results = queryString
+    ? tagOptions.value.filter((s) => s.includes(queryString)).map((s) => ({ value: s }))
+    : tagOptions.value.map((s) => ({ value: s }))
+  cb(results)
 }
 
 async function load() {
@@ -191,9 +225,10 @@ function openEdit(row) {
   editVisible.value = true
 }
 
-function addEditTag() {
-  const v = editTagInput.value.trim()
-  if (v) editForm.value.tags.push(v)
+function addEditTag(item) {
+  // el-autocomplete @select 传 {value}，回车传事件对象；统一取文本
+  const v = (item && typeof item === 'object' ? item.value : editTagInput.value || '').trim()
+  if (v && !editForm.value.tags.includes(v)) editForm.value.tags.push(v)
   editTagInput.value = ''
 }
 
@@ -235,8 +270,16 @@ function openBatchPrint() {
   router.push({ path: '/cutting-list/print', query: { mode: 'ledger', ids } })
 }
 
+async function onDelete(row) {
+  await ElMessageBox.confirm(`确认删除下料单 #${row.id}（订单 ${row.order_no}）？删除后该订单可重新生成。`, '删除确认', { type: 'warning' })
+  await cuttingApi.remove(row.id)
+  ElMessage.success('已删除')
+  load()
+}
+
 onMounted(async () => {
   cutConfig.value = (await cuttingApi.getConfig()).data
+  tagOptions.value = (await cuttingApi.getTags()).data || []
   load()
 })
 </script>

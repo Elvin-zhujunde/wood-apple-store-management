@@ -15,6 +15,22 @@ router.get(
   })
 );
 
+// 加工备注标签联想：全量去重数组（静态路径，须在 /:id 之前声明）
+router.get(
+  '/tags',
+  wrap(async (req, res) => {
+    const [rows] = await pool.query("SELECT remark_tags FROM cutting_list WHERE remark_tags IS NOT NULL AND remark_tags != ''");
+    const set = new Set();
+    for (const row of rows) {
+      try {
+        const arr = JSON.parse(row.remark_tags);
+        if (Array.isArray(arr)) arr.forEach((s) => { if (typeof s === 'string' && s) set.add(s); });
+      } catch {}
+    }
+    ok(res, [...set].sort());
+  })
+);
+
 // 列表（分页+筛选，LEFT JOIN sales_orders 带 13 列展示字段）
 router.get(
   '/',
@@ -143,6 +159,16 @@ router.put(
       ]
     );
     ok(res, null, '更新成功');
+  })
+);
+
+// 删除下料单（一单一单可重建，物理删除）
+router.delete(
+  '/:id',
+  wrap(async (req, res) => {
+    const [r] = await pool.query('DELETE FROM cutting_list WHERE id = ?', [req.params.id]);
+    if (r.affectedRows === 0) return fail(res, '下料单不存在');
+    ok(res, null, '已删除');
   })
 );
 
