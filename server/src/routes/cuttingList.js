@@ -58,4 +58,80 @@ router.get(
   })
 );
 
+// 生成下料单（ARE-111：双模式，普通按 config 默认值算，特殊手填）
+router.post(
+  '/',
+  wrap(async (req, res) => {
+    const { order_id, mode = 1, door_height, door_width, handler } = req.body;
+    if (!order_id) return fail(res, '缺少订单 id');
+    // 取订单门洞尺寸（快照源）
+    const [orders] = await pool.query(
+      'SELECT id, door_h, door_w, wall_thick FROM sales_orders WHERE id = ?',
+      [order_id]
+    );
+    if (orders.length === 0) return fail(res, '订单不存在');
+    const o = orders[0];
+    if (o.door_h == null || o.door_w == null) return fail(res, '订单未录门洞尺寸，无法生成下料单');
+
+    // 计算门扇尺寸
+    let finalDoorH, finalDoorW;
+    if (Number(mode) === 2) {
+      // 特殊模式：手填
+      if (door_height == null || door_width == null) return fail(res, '特殊模式需手填门扇高/宽');
+      finalDoorH = Number(door_height);
+      finalDoorW = Number(door_width);
+    } else {
+      // 普通模式：按 config 默认值自动扣尺
+      finalDoorH = Number(o.door_h) - Number(config.cutting.defaultHeightCut);
+      finalDoorW = Number(o.door_w) - Number(config.cutting.defaultWidthCut);
+    }
+
+    try {
+      const [r] = await pool.query(
+        `INSERT INTO cutting_list
+          (order_id, hole_height, hole_width, wall_thickness, door_height, door_width, mode, handler)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [order_id, o.door_h, o.door_w, o.wall_thick, finalDoorH, finalDoorW, Number(mode) === 2 ? 2 : 1, handler || null]
+      );
+      ok(res, { id: r.insertId }, '下料单已生成');
+    } catch (e) {
+      if (e.code === 'ER_DUP_ENTRY') return fail(res, '该订单已有下料单，不可重复生成');
+      throw e;
+    }
+  })
+);
+
+// 编辑（师傅微调门扇尺寸 + 状态流转 待下料→已下料填 cut_date）
+router.put(
+  '/:id',
+  wrap(async (req, res) => {
+    const { door_height, door_width, status, cut_date, handler } = req.body;
+    const [rows] = await pool.query('SELECT * FROM cutting_list WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return fail(res, '下料单不存在');
+    const cl = rows[0];
+
+    // 状态流转校验：标记已下料必须填下料日期
+    let finalStatus = cl.status;
+    if (status === '已下料') {
+      if (!cut_date) return fail(res, '标记已下料需填下料日期');
+      finalStatus = '已下料';
+    } else if (status === '待下料') {
+      finalStatus = '待下料';
+    }
+
+    await pool.query(
+      `UPDATE cutting_list SET door_height=?, door_width=?, status=?, cut_date=?, handler=? WHERE id=?`,
+      [
+        door_height != null ? Number(door_height) : cl.door_height,
+        door_width != null ? Number(door_width) : cl.door_width,
+        finalStatus,
+        cut_date || cl.cut_date,
+        handler || cl.handler,
+        req.params.id,
+      ]
+    );
+    ok(res, null, '更新成功');
+  })
+);
+
 module.exports = router;

@@ -51,12 +51,13 @@
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === '新建'" link type="primary" class="row-btn" @click="openShip(row)">发货</el-button>
           <el-button v-if="row.status === '已发货'" link type="success" class="row-btn" @click="openPay(row)">收款</el-button>
           <el-button v-if="row.status === '已收款'" link disabled class="row-btn">已完成</el-button>
           <el-button link type="primary" @click="openEdit(row)">详情</el-button>
+          <el-button link type="warning" @click="openCutting(row)">下料单</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -174,6 +175,38 @@
       <template #footer>
         <el-button @click="batchPayVisible = false">取消</el-button>
         <el-button type="primary" :disabled="batchPayableCount === 0" @click="onBatchPay">确认批量收款</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 生成下料单弹窗（ARE-111：普通自动扣尺/特殊手填） -->
+    <el-dialog v-model="cuttingVisible" title="生成下料单" width="520px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        订单 <strong>{{ cutRow?.order_no }}</strong> · {{ cutRow?.customer }} · 门洞 {{ cutRow?.door_h }}×{{ cutRow?.door_w }}
+        <span v-if="cutRow?.wall_thick"> · 墙厚 {{ cutRow?.wall_thick }}</span>
+      </el-alert>
+      <el-form :model="cutForm" label-width="100px">
+        <el-form-item label="下料方式" required>
+          <el-radio-group v-model="cutForm.mode">
+            <el-radio :value="1">普通（自动扣尺）</el-radio>
+            <el-radio :value="2">特殊（手动录入）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="门扇高" required>
+          <el-input-number v-model="cutForm.door_height" :min="0" :precision="2" controls-position="right" style="width:100%" :disabled="cutForm.mode === 1" />
+          <div v-if="cutForm.mode === 1" class="muted">= 门洞高 {{ cutRow?.door_h }} − 默认 {{ cutConfig.defaultHeightCut }}（可切特殊模式手改）</div>
+          <div v-else class="muted">双开门/异型门手动录入门扇尺寸</div>
+        </el-form-item>
+        <el-form-item label="门扇宽" required>
+          <el-input-number v-model="cutForm.door_width" :min="0" :precision="2" controls-position="right" style="width:100%" :disabled="cutForm.mode === 1" />
+          <div v-if="cutForm.mode === 1" class="muted">= 门洞宽 {{ cutRow?.door_w }} − 默认 {{ cutConfig.defaultWidthCut }}</div>
+        </el-form-item>
+        <el-form-item label="经手人">
+          <el-input v-model="cutForm.handler" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="cuttingVisible = false">取消</el-button>
+        <el-button type="primary" @click="onCutting">确认生成</el-button>
       </template>
     </el-dialog>
 
@@ -301,8 +334,8 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { orderApi, bomApi, attachmentApi } from '../api'
+import { useRoute, useRouter } from 'vue-router'
+import { orderApi, bomApi, attachmentApi, cuttingApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
@@ -310,6 +343,7 @@ import ImageUpload from '../components/ImageUpload.vue'
 
 const store = useUserStore()
 const route = useRoute()
+const router = useRouter()
 const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
@@ -336,6 +370,12 @@ const batchShipVisible = ref(false)
 const batchShipForm = ref({})
 const batchPayVisible = ref(false)
 const batchPayForm = ref({})
+
+// 下料单生成
+const cuttingVisible = ref(false)
+const cutRow = ref(null)
+const cutForm = ref({})
+const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 
 const colorOptions = computed(() => {
   const bom = bomList.value.find((b) => b.id === form.value.door_bom_id)
@@ -542,8 +582,49 @@ async function onPay() {
   load()
 }
 
+// 生成下料单（ARE-111）：先查该订单是否已有下料单，有则跳查看，无则弹窗选模式
+async function openCutting(row) {
+  try {
+    const res = await cuttingApi.list({ order_no: row.order_no, pageSize: 1 })
+    if (res.data.total > 0) {
+      router.push('/cutting-list')
+      ElMessage.info('该订单已有下料单，已跳转下料单页')
+      return
+    }
+  } catch (e) {}
+  if (row.door_h == null || row.door_w == null) {
+    return ElMessage.warning('订单未录门洞尺寸，请先在订单详情补录')
+  }
+  cutRow.value = row
+  cutForm.value = {
+    mode: 1,
+    door_height: Number(row.door_h) - Number(cutConfig.value.defaultHeightCut),
+    door_width: Number(row.door_w) - Number(cutConfig.value.defaultWidthCut),
+    handler: store.name,
+  }
+  cuttingVisible.value = true
+}
+
+async function onCutting() {
+  const f = cutForm.value
+  const r = cutRow.value
+  if (f.mode === 2 && (!f.door_height || !f.door_width)) {
+    return ElMessage.warning('特殊模式需手填门扇高/宽')
+  }
+  await cuttingApi.create({
+    order_id: r.id,
+    mode: f.mode,
+    door_height: f.door_height,
+    door_width: f.door_width,
+    handler: f.handler,
+  })
+  ElMessage.success('下料单已生成')
+  cuttingVisible.value = false
+}
+
 onMounted(async () => {
   bomList.value = (await bomApi.all()).data
+  cutConfig.value = (await cuttingApi.getConfig()).data
   // 工作台待办跳转带 status query，自动筛选
   if (route.query.status) {
     query.value.status = String(route.query.status)

@@ -13,6 +13,7 @@ const routes = [
       { path: 'inventory', name: 'inventory', component: () => import('../views/inventory.vue'), meta: { title: '库存查询' } },
       { path: 'suggestion', name: 'suggestion', component: () => import('../views/suggestion.vue'), meta: { title: '采购建议' } },
       { path: 'orders', name: 'orders', component: () => import('../views/orders.vue'), meta: { title: '销售订单' } },
+      { path: 'cutting-list', name: 'cutting-list', component: () => import('../views/cuttingList.vue'), meta: { title: '下料单' } },
       { path: 'inbound', name: 'inbound', component: () => import('../views/inbound.vue'), meta: { title: '采购入库' } },
       { path: 'requisition', name: 'requisition', component: () => import('../views/requisition.vue'), meta: { title: '生产领料' } },
       { path: 'materials', name: 'materials', component: () => import('../views/materials.vue'), meta: { title: '物料档案' } },

@@ -6,6 +6,7 @@ export const menuList = [
   { path: '/inventory', title: '库存查询', icon: 'Box', roles: ALL },
   { path: '/suggestion', title: '采购建议', icon: 'Warning', roles: ALL },
   { path: '/orders', title: '销售订单', icon: 'Document', roles: ALL },
+  { path: '/cutting-list', title: '下料单', icon: 'ScaleToOriginal', roles: ALL },
   { path: '/inbound', title: '采购入库', icon: 'Goods', roles: ALL },
   { path: '/requisition', title: '生产领料', icon: 'Tools', roles: ALL },
   { path: '/materials', title: '物料档案', icon: 'Files', roles: ALL },

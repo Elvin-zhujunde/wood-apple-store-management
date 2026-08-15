@@ -60,6 +60,15 @@ export const suggestionApi = {
   adopt: (id, data) => request.post('/purchase-suggestion/' + id + '/adopt', data),
 }
 
+// 下料单（ARE-110/111/112）
+export const cuttingApi = {
+  list: (params) => request.get('/cutting-list', { params }),
+  detail: (id) => request.get('/cutting-list/' + id),
+  create: (data) => request.post('/cutting-list', data),
+  update: (id, data) => request.put('/cutting-list/' + id, data),
+  getConfig: () => request.get('/cutting-list/config'),
+}
+
 // 业务图片附件
 export const attachmentApi = {
   list: (entity_type, entity_id) => request.get('/attachments', { params: { entity_type, entity_id } }),
