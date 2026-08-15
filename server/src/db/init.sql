@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS materials (
   unit          VARCHAR(20)  NOT NULL COMMENT '计量单位',
   stock_qty     DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT '当前库存数量(缓存,由流水维护)',
   safety_stock  DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT '最低安全库存',
+  origin_place  VARCHAR(100) NULL COMMENT '生产地(如江西赣州)',
+  manufacturer  VARCHAR(100) NULL COMMENT '厂家名',
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物料档案';
 

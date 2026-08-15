@@ -5,6 +5,7 @@
         <el-option label="主材" value="主材" /><el-option label="耗材" value="耗材" />
       </el-select>
       <el-input v-model="query.keyword" placeholder="名称/编码" clearable style="width:180px" @change="load" />
+      <el-input v-model="query.manufacturer" placeholder="厂家" clearable style="width:140px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
       <el-button type="success" @click="openAdd">+ 新增物料</el-button>
     </div>
@@ -16,6 +17,8 @@
       <el-table-column prop="unit" label="单位" width="70" />
       <el-table-column prop="stock_qty" label="当前库存" width="100" align="right" />
       <el-table-column prop="safety_stock" label="安全库存" width="100" align="right" />
+      <el-table-column prop="origin_place" label="生产地" min-width="100" />
+      <el-table-column prop="manufacturer" label="厂家" min-width="100" />
       <el-table-column label="操作" width="130" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
@@ -45,6 +48,8 @@
           </el-select>
           <div class="muted">板材:张 线条:支/米 五金:把/套 胶:桶</div>
         </el-form-item>
+        <el-form-item label="生产地"><el-input v-model="form.origin_place" placeholder="如 江西赣州" /></el-form-item>
+        <el-form-item label="厂家名"><el-input v-model="form.manufacturer" placeholder="如 XX板材厂" /></el-form-item>
         <el-form-item label="安全库存"><el-input-number v-model="form.safety_stock" :min="0" :precision="3" style="width:100%" /></el-form-item>
         <el-form-item v-if="isEdit" label="物料图片">
           <ImageUpload v-model="imgList" entity-type="material" :entity-id="form.id" />
@@ -64,7 +69,7 @@ import { materialApi, attachmentApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ImageUpload from '../components/ImageUpload.vue'
 
-const query = ref({ category: '', keyword: '', page: 1, pageSize: 20 })
+const query = ref({ category: '', keyword: '', manufacturer: '', page: 1, pageSize: 20 })
 const list = ref([])
 const total = ref(0)
 const dlgVisible = ref(false)
@@ -83,7 +88,7 @@ async function load() {
 
 function openAdd() {
   isEdit.value = false
-  form.value = { code: '', name: '', category: '主材', spec: '', unit: '', safety_stock: 0 }
+  form.value = { code: '', name: '', category: '主材', spec: '', unit: '', safety_stock: 0, origin_place: '', manufacturer: '' }
   dlgVisible.value = true
 }
 

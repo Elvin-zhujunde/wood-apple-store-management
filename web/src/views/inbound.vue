@@ -26,6 +26,9 @@
       <el-table-column prop="qty" label="数量" width="80" align="right" />
       <el-table-column prop="unit_price" label="进价" width="80" align="right" />
       <el-table-column prop="freight" label="物流费" width="90" align="right" />
+      <el-table-column label="总进价" width="100" align="right">
+        <template #default="{ row }">{{ totalCost(row) }}</template>
+      </el-table-column>
       <el-table-column prop="purchase_date" label="进货日" width="120" :formatter="dateFmt" />
       <el-table-column prop="actual_arrival" label="到货日" width="120" :formatter="dateFmt" />
       <el-table-column prop="handler" label="经手人" width="80" />
@@ -64,6 +67,7 @@
           <el-col :span="12"><el-form-item label="进货数量" required><el-input-number v-model="form.qty" :min="0" :precision="3" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="进货单价" required><el-input-number v-model="form.unit_price" :min="0" :precision="2" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="物流费用"><el-input-number v-model="form.freight" :min="0" :precision="2" style="width:100%" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="总进价"><el-input :model-value="formTotalCost" disabled /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="进货日期" required><el-date-picker v-model="form.purchase_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="预计到货"><el-date-picker v-model="form.expected_arrival" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="经手人" required><el-input v-model="form.handler" /></el-form-item></el-col>
@@ -171,6 +175,15 @@ const curSpec = computed(() => {
   const m = mats.value.find((x) => x.id === form.value.material_id)
   return m ? `${m.spec} / ${m.unit}` : ''
 })
+
+// R10 总进价 = 单价×数量+运费（前端实时算，不存库）
+const formTotalCost = computed(() => {
+  const f = form.value
+  return (Number(f.qty) * Number(f.unit_price) + Number(f.freight || 0)).toFixed(2)
+})
+function totalCost(row) {
+  return (Number(row.qty) * Number(row.unit_price) + Number(row.freight || 0)).toFixed(2)
+}
 
 async function load() {
   const params = { ...query.value }

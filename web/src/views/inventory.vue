@@ -16,6 +16,8 @@
       <el-table-column prop="unit" label="单位" width="70" />
       <el-table-column prop="stock_qty" label="当前库存" width="100" align="right" />
       <el-table-column prop="safety_stock" label="安全库存" width="100" align="right" />
+      <el-table-column prop="origin_place" label="生产地" min-width="100" />
+      <el-table-column prop="manufacturer" label="厂家" min-width="100" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>

@@ -10,7 +10,7 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { category, keyword, page = 1, pageSize = 20 } = req.query;
+    const { category, keyword, manufacturer, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (category) {
@@ -20,6 +20,10 @@ router.get(
     if (keyword) {
       where.push('(name LIKE ? OR code LIKE ?)');
       params.push(`%${keyword}%`, `%${keyword}%`);
+    }
+    if (manufacturer) {
+      where.push('manufacturer LIKE ?');
+      params.push(`%${manufacturer}%`);
     }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const total = (
@@ -39,7 +43,7 @@ router.get(
 router.get(
   '/all',
   wrap(async (req, res) => {
-    const [rows] = await pool.query('SELECT id, code, name, category, spec, unit, stock_qty FROM materials ORDER BY id');
+    const [rows] = await pool.query('SELECT id, code, name, category, spec, unit, stock_qty, origin_place, manufacturer FROM materials ORDER BY id');
     ok(res, rows);
   })
 );
@@ -58,12 +62,12 @@ router.get(
 router.post(
   '/',
   wrap(async (req, res) => {
-    const { code, name, category, spec, unit, safety_stock = 0 } = req.body;
+    const { code, name, category, spec, unit, safety_stock = 0, origin_place, manufacturer } = req.body;
     if (!code || !name || !category || !spec || !unit) return fail(res, '编码/名称/分类/规格/单位 必填');
     try {
       const [r] = await pool.query(
-        'INSERT INTO materials (code, name, category, spec, unit, safety_stock) VALUES (?,?,?,?,?,?)',
-        [code, name, category, spec, unit, safety_stock]
+        'INSERT INTO materials (code, name, category, spec, unit, safety_stock, origin_place, manufacturer) VALUES (?,?,?,?,?,?,?,?)',
+        [code, name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null]
       );
       ok(res, { id: r.insertId }, '新增成功');
     } catch (e) {
@@ -77,10 +81,10 @@ router.post(
 router.put(
   '/:id',
   wrap(async (req, res) => {
-    const { name, category, spec, unit, safety_stock } = req.body;
+    const { name, category, spec, unit, safety_stock, origin_place, manufacturer } = req.body;
     await pool.query(
-      'UPDATE materials SET name=?, category=?, spec=?, unit=?, safety_stock=? WHERE id=?',
-      [name, category, spec, unit, safety_stock, req.params.id]
+      'UPDATE materials SET name=?, category=?, spec=?, unit=?, safety_stock=?, origin_place=?, manufacturer=? WHERE id=?',
+      [name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null, req.params.id]
     );
     ok(res, null, '更新成功');
   })

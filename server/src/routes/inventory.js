@@ -17,7 +17,7 @@ router.get(
     if (keyword) { where.push('(name LIKE ? OR code LIKE ?)'); params.push(`%${keyword}%`, `%${keyword}%`); }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [rows] = await pool.query(
-      `SELECT id, code, name, category, spec, unit, stock_qty, safety_stock FROM materials ${clause} ORDER BY id`,
+      `SELECT id, code, name, category, spec, unit, stock_qty, safety_stock, origin_place, manufacturer FROM materials ${clause} ORDER BY id`,
       params
     );
     const list = rows.map((m) => {
