@@ -13,6 +13,7 @@
       <el-input v-model="query.material_name" placeholder="物料名称" clearable style="width:140px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
       <el-button @click="resetQuery">重置</el-button>
+      <el-button type="warning" @click="rescan">刷新建议</el-button>
     </div>
     <el-alert type="warning" :closable="false" style="margin-bottom:12px">
       系统在<strong>销售订单保存时自动按 BOM 拆解</strong>物料需求并对比库存生成采购建议。点【采纳】可一键生成待到货采购入库单，到货确认后库存自动增加。
@@ -26,9 +27,9 @@
       <el-table-column prop="suggest_qty" label="建议采购量" width="110" align="right">
         <template #default="{ row }"><strong style="color:#f56c6c">{{ row.suggest_qty }}</strong></template>
       </el-table-column>
-      <el-table-column label="优先级" width="90">
+      <el-table-column label="缺口" width="90" align="right">
         <template #default="{ row }">
-          <el-tag :type="row.priority === '紧急' ? 'danger' : 'info'" size="small">{{ row.priority }}</el-tag>
+          <strong style="color:#f56c6c">{{ (Number(row.safety_stock) - Number(row.stock_qty)).toFixed(3) }}</strong>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90">
@@ -56,15 +57,15 @@
       @current-change="load"
     />
 
-    <!-- 采纳弹窗：补厂家/进价/预计到货，数量默认建议量 -->
+    <!-- 采纳弹窗：补厂家/进价/预计到货，采购数量必填(系统不算) -->
     <el-dialog v-model="adoptVisible" title="采纳采购建议" width="480px" :close-on-click-modal="false">
       <el-alert type="info" :closable="false" style="margin-bottom:12px">
-        <strong>{{ adoptRow?.name }}</strong> · {{ adoptRow?.code }} · 关联订单 {{ adoptRow?.order_no }}（{{ adoptRow?.customer }}）
+        <strong>{{ adoptRow?.name }}</strong> · {{ adoptRow?.code }} · 当前库存 {{ adoptRow?.stock_qty }} / 安全库存 {{ adoptRow?.safety_stock }}
       </el-alert>
       <el-form :model="adoptForm" label-width="100px">
         <el-form-item label="采购数量" required>
-          <el-input-number v-model="adoptForm.qty" :min="0" :precision="3" style="width:100%" />
-          <div class="muted">默认取建议采购量 {{ adoptRow?.suggest_qty }}，可调整</div>
+          <el-input-number v-model="adoptForm.qty" :min="0" :precision="3" style="width:100%" placeholder="请填写本次采购数量" />
+          <div class="muted">系统不再自动算建议量，请按实际采购填写</div>
         </el-form-item>
         <el-form-item label="进货厂家" required>
           <el-input v-model="adoptForm.supplier" placeholder="供货厂家" />
@@ -122,7 +123,7 @@ function resetQuery() {
 function openAdopt(row) {
   adoptRow.value = row
   adoptForm.value = {
-    qty: Number(row.suggest_qty),
+    qty: undefined,
     supplier: '',
     unit_price: 0,
     freight: 0,
@@ -134,7 +135,8 @@ function openAdopt(row) {
 
 async function onAdopt() {
   const f = adoptForm.value
-  if (!f.qty || !f.supplier || !f.unit_price || !f.handler)
+  if (!f.qty || Number(f.qty) <= 0) return ElMessage.warning('请填写采购数量')
+  if (!f.supplier || !f.unit_price || !f.handler)
     return ElMessage.warning('请补全厂家/进价/经手人')
   const res = await suggestionApi.adopt(adoptRow.value.id, f)
   ElMessage.success(`已采纳，已生成采购入库单 ${res.data.inbound_no}（待到货）`)
@@ -145,6 +147,13 @@ async function onAdopt() {
 async function markDone(row) {
   await suggestionApi.updateStatus(row.id, '已采购')
   ElMessage.success('已标记为已采购')
+  load()
+}
+
+// 手动全量扫描低库存物料生成/消除建议
+async function rescan() {
+  const res = await suggestionApi.generate()
+  ElMessage.success(res.msg || '扫描完成')
   load()
 }
 

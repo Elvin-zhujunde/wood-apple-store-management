@@ -30,13 +30,13 @@
 
     <!-- 待办清单 -->
     <el-row :gutter="16" class="mt">
-      <!-- 🔴 紧急待采购建议 -->
+      <!-- 🔴 待采购建议（库存≤安全库存） -->
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="never" class="todo-card">
           <template #header>
             <div class="todo-header" @click="go('/suggestion')">
               <span class="dot dot-red"></span>
-              <span>紧急待采购</span>
+              <span>待采购</span>
               <el-badge :value="urgentSug.length" :hidden="!urgentSug.length" type="danger" class="todo-badge" />
             </div>
           </template>
@@ -44,7 +44,7 @@
           <div v-else>
             <div v-for="s in urgentSug" :key="s.id" class="todo-item" @click="go('/suggestion')">
               <div class="todo-main">{{ s.name }} <span class="todo-sub">{{ s.code }}</span></div>
-              <div class="todo-meta">建议采购 <strong style="color:#f56c6c">{{ s.suggest_qty }}</strong> {{ s.unit }} · {{ s.customer }}</div>
+              <div class="todo-meta">库存 <strong style="color:#f56c6c">{{ s.stock_qty }}</strong> / 安全 {{ s.safety_stock }} {{ s.unit }}</div>
             </div>
             <el-button link type="primary" size="small" @click="go('/suggestion')">查看全部 →</el-button>
           </div>
@@ -174,7 +174,7 @@ onMounted(async () => {
     inventoryApi.list(),
     inboundApi.list({ status: '待到货', pageSize: 5 }),
     inboundApi.list({ status: '待到货', pageSize: 1 }),
-    suggestionApi.list({ status: '待采购', priority: '紧急', pageSize: 5 }),
+    suggestionApi.list({ status: '待采购', pageSize: 5 }),
     suggestionApi.list({ status: '待采购', pageSize: 1 }),
     orderApi.list({ status: '新建', pageSize: 5 }),
     orderApi.list({ status: '已发货', pageSize: 5 }),

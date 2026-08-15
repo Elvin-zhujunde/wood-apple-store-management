@@ -161,8 +161,8 @@ CREATE TABLE IF NOT EXISTS inventory_log (
 CREATE TABLE IF NOT EXISTS purchase_suggestion (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   material_id INT           NOT NULL,
-  suggest_qty DECIMAL(14,3) NOT NULL COMMENT '建议采购数量',
-  order_id    INT           NOT NULL COMMENT '关联订单',
+  suggest_qty DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT '建议采购数量(ARE-108安全库存驱动:0=不算,采纳时用户自填)',
+  order_id    INT           NULL COMMENT '关联订单(BOM驱动历史保留;安全库存驱动为NULL)',
   priority    ENUM('紧急','常规') NOT NULL DEFAULT '常规',
   status      ENUM('待采购','已采购') NOT NULL DEFAULT '待采购',
   inbound_id  INT           NULL COMMENT '采纳后生成的采购入库单id(可溯源)',

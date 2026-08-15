@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db/pool');
 const { ok, fail, wrap, genDocNo } = require('../utils/helpers');
 const { auth } = require('../middlewares/auth');
+const { checkSafetyStock } = require('../services/purchaseSuggestionService');
 
 const router = express.Router();
 router.use(auth);
@@ -65,7 +66,17 @@ router.post(
         [material_id, 'out', qty, req_no, req.user.name]
       );
       await conn.commit();
-      ok(res, { id: r.insertId, req_no }, '领料成功，库存已减少');
+      // ARE-108：领料扣库存后检查安全库存，可能触发采购建议
+      let suggestion = null;
+      try {
+        suggestion = await checkSafetyStock(material_id, req.user.name);
+      } catch (e) {
+        console.error('安全库存检查失败:', e.message);
+      }
+      const msg = suggestion && suggestion.action === 'created'
+        ? `领料成功，库存已减少；${suggestion.name} 库存 ${suggestion.stock_qty} ≤ 安全库存 ${suggestion.safety_stock}，已生成采购建议`
+        : '领料成功，库存已减少';
+      ok(res, { id: r.insertId, req_no, suggestion }, msg);
     } catch (e) {
       await conn.rollback();
       throw e;

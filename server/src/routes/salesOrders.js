@@ -2,7 +2,6 @@ const express = require('express');
 const { pool } = require('../db/pool');
 const { ok, fail, wrap, genDocNo } = require('../utils/helpers');
 const { auth } = require('../middlewares/auth');
-const { generateForOrder } = require('../services/purchaseSuggestionService');
 
 const router = express.Router();
 router.use(auth);
@@ -150,15 +149,8 @@ router.post(
        remark || null, edge_band || null, frame_line || null, customer_type || null, address || null]
     );
 
-    // 触发采购建议生成（核心）
-    let suggestion = null;
-    try {
-      suggestion = await generateForOrder(r.insertId, req.user.name);
-    } catch (e) {
-      console.error('采购建议生成失败:', e.message);
-    }
-
-    ok(res, { id: r.insertId, order_no, suggestion }, '接单成功');
+    // ARE-108：采购建议改为安全库存驱动，接单不再触发（领料/入库时触发）
+    ok(res, { id: r.insertId, order_no }, '接单成功');
   })
 );
 

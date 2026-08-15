@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db/pool');
 const { ok, fail, wrap, genDocNo } = require('../utils/helpers');
 const { auth } = require('../middlewares/auth');
+const { checkSafetyStock } = require('../services/purchaseSuggestionService');
 
 const router = express.Router();
 router.use(auth);
@@ -74,6 +75,12 @@ router.put(
           ['已采购', id, '待采购']
         );
         await conn.commit();
+        // ARE-108：到货加库存后检查安全库存（消除已满足的建议）
+        try {
+          await checkSafetyStock(pi.material_id, req.user.name);
+        } catch (e) {
+          console.error('安全库存检查失败:', e.message);
+        }
         success++;
       } catch (e) {
         await conn.rollback();
@@ -143,7 +150,17 @@ router.put(
         ['已采购', req.params.id, '待采购']
       );
       await conn.commit();
-      ok(res, null, '已确认到货，库存已增加');
+      // ARE-108：到货加库存后检查安全库存，可能消除已满足的采购建议
+      let suggestion = null;
+      try {
+        suggestion = await checkSafetyStock(pi.material_id, req.user.name);
+      } catch (e) {
+        console.error('安全库存检查失败:', e.message);
+      }
+      const msg = suggestion && suggestion.action === 'cleared'
+        ? `已确认到货，库存已增加；${suggestion.name} 库存恢复至 ${suggestion.stock_qty} > 安全库存 ${suggestion.safety_stock}，采购建议已消除`
+        : '已确认到货，库存已增加';
+      ok(res, { suggestion }, msg);
     } catch (e) {
       await conn.rollback();
       throw e;

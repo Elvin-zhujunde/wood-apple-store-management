@@ -2,12 +2,12 @@ const express = require('express');
 const { pool } = require('../db/pool');
 const { ok, fail, wrap, genDocNo } = require('../utils/helpers');
 const { auth } = require('../middlewares/auth');
-const { generateForOrder } = require('../services/purchaseSuggestionService');
+const { scanAllLowStock } = require('../services/purchaseSuggestionService');
 
 const router = express.Router();
 router.use(auth);
 
-// 列表
+// 列表（ARE-108：安全库存驱动，order_id 可空，LEFT JOIN 订单；带出当前库存/安全库存）
 router.get(
   '/',
   wrap(async (req, res) => {
@@ -21,14 +21,15 @@ router.get(
     if (material_name) { where.push('m.name LIKE ?'); params.push(`%${material_name}%`); }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const total = (
-      await pool.query(`SELECT COUNT(*) c FROM purchase_suggestion ps JOIN materials m ON m.id = ps.material_id JOIN sales_orders so ON so.id = ps.order_id ${clause}`, params)
+      await pool.query(`SELECT COUNT(*) c FROM purchase_suggestion ps JOIN materials m ON m.id = ps.material_id LEFT JOIN sales_orders so ON so.id = ps.order_id ${clause}`, params)
     )[0][0].c;
     const rows = (
       await pool.query(
-        `SELECT ps.*, m.code, m.name, m.spec, m.unit, so.order_no, so.customer
+        `SELECT ps.*, m.code, m.name, m.spec, m.unit, m.stock_qty, m.safety_stock,
+                so.order_no, so.customer
            FROM purchase_suggestion ps
            JOIN materials m ON m.id = ps.material_id
-           JOIN sales_orders so ON so.id = ps.order_id
+           LEFT JOIN sales_orders so ON so.id = ps.order_id
           ${clause} ORDER BY ps.id DESC LIMIT ? OFFSET ?`,
         [...params, Number(pageSize), (Number(page) - 1) * Number(pageSize)]
       )
@@ -37,18 +38,17 @@ router.get(
   })
 );
 
-// 手动触发某订单的采购建议生成
+// 手动全量扫描低库存物料生成采购建议（ARE-108：安全库存驱动，替代原按订单生成）
 router.post(
   '/generate',
   wrap(async (req, res) => {
-    const { order_id } = req.body;
-    if (!order_id) return fail(res, 'order_id 必填');
-    const result = await generateForOrder(order_id, req.user.name);
-    ok(res, result, '采购建议已生成');
+    const result = await scanAllLowStock(req.user.name);
+    ok(res, result, `扫描完成：新增 ${result.created} 条建议${result.cleared ? `，消除 ${result.cleared} 条已满足建议` : ''}`);
   })
 );
 
 // 采纳建议 —— 生成一张"待到货"采购入库单，回填 inbound_id，建议转已采购
+// ARE-108：建议数量不算(suggest_qty=0)，采购数量由用户必填
 router.post(
   '/:id/adopt',
   wrap(async (req, res) => {
@@ -64,8 +64,9 @@ router.post(
     if (sug.status === '已采购') return fail(res, '该建议已采纳/已采购');
     if (!supplier || !unit_price || !handler)
       return fail(res, '厂家/进价/经手人 必填');
+    if (!qty || Number(qty) <= 0) return fail(res, '采购数量必填（系统不再自动算建议量）');
 
-    const purchaseQty = qty || sug.suggest_qty;
+    const purchaseQty = qty;
     const purchase_date = new Date().toISOString().slice(0, 10);
     const inbound_no = await genDocNo('purchase_inbound', 'RK', 'inbound');
 
