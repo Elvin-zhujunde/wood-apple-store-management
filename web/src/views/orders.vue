@@ -312,25 +312,31 @@
 
         <el-tab-pane v-if="isEdit" label="收款回填" name="pay">
           <el-form :model="form" label-width="110px">
+            <el-alert v-if="payLocked" type="warning" :closable="false" style="margin-bottom:12px">
+              该订单已完成（已收款），收款信息已锁定，普通编辑不可改动。如需修正多收/误标，请<span style="color:#f56c6c;font-weight:600">反结订单</span>回到赊账中再核对。
+            </el-alert>
             <el-form-item label="应收款">
               <el-input :model-value="form.total_amount" disabled />
               <div class="muted">订单总金额（自动）</div>
             </el-form-item>
             <el-form-item label="已付金额">
-              <el-input-number v-model="form.paid_amount" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="默认填应收额=全额结清，填少于应收=赊账欠款" />
+              <el-input-number v-model="form.paid_amount" :min="0" :precision="2" :disabled="payLocked" controls-position="right" style="width:100%" placeholder="默认填应收额=全额结清，填少于应收=赊账欠款" />
             </el-form-item>
             <el-form-item label="欠款">
               <el-input :model-value="balanceDue" disabled :class="{ 'balance-over': balanceDue > 0 }" />
               <div class="muted">= 应收 − 已付，欠款&gt;0 为未结清</div>
             </el-form-item>
             <el-form-item label="付款方式">
-              <el-select v-model="form.pay_method" clearable style="width:100%">
+              <el-select v-model="form.pay_method" :disabled="payLocked" clearable style="width:100%">
                 <el-option label="扫码" value="扫码" /><el-option label="现金" value="现金" /><el-option label="转账" value="转账" /><el-option label="赊账" value="赊账" />
               </el-select>
             </el-form-item>
-            <el-form-item label="收款日期"><el-date-picker v-model="form.pay_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
-            <el-form-item label="收据单号"><el-input v-model="form.receipt_no" /></el-form-item>
-            <el-form-item label="收款经手人"><el-input v-model="form.handler_finance" /></el-form-item>
+            <el-form-item label="收款日期"><el-date-picker v-model="form.pay_date" :disabled="payLocked" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
+            <el-form-item label="收据单号"><el-input v-model="form.receipt_no" :disabled="payLocked" /></el-form-item>
+            <el-form-item label="收款经手人"><el-input v-model="form.handler_finance" :disabled="payLocked" /></el-form-item>
+            <el-form-item v-if="payLocked">
+              <el-button type="danger" plain @click="onReopen">反结订单（回赊账中）</el-button>
+            </el-form-item>
           </el-form>
         </el-tab-pane>
 
@@ -353,7 +359,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi, bomApi, attachmentApi, cuttingApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../store/user'
 import ImageUpload from '../components/ImageUpload.vue'
 import TagInput from '../components/TagInput.vue'
@@ -411,6 +417,28 @@ const balanceDue = computed(() => {
   const paid = Number(form.value.paid_amount) || 0
   return Math.round((total - paid) * 100) / 100
 })
+// 已收款订单收款信息锁定（防误操作拖回状态）；反结入口在收款 tab
+const payLocked = computed(() => form.value.status === '已收款')
+
+// 反结：已收款 → 赊账中（保留已付金额，回到可重新核对收款的状态）
+async function onReopen() {
+  const f = form.value
+  try {
+    await ElMessageBox.confirm(
+      `确认反结订单 ${f.order_no}？\n订单将从"已收款"回到"赊账中"，已付金额保留，可重新核对收款信息。`,
+      '反结确认',
+      { confirmButtonText: '反结', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return // 用户取消
+  }
+  await orderApi.reopen(f.id)
+  ElMessage.success('已反结，回到赊账中')
+  // 重新拉详情刷新 form.status → 收款 tab 字段解锁，可继续核对
+  const res = await orderApi.detail(f.id)
+  form.value = { ...res.data }
+  load()
+}
 // 列表行欠款（R7）
 function balanceOf(row) {
   if (row.paid_amount == null) return 0

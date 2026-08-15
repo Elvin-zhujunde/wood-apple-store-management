@@ -177,16 +177,35 @@ router.put(
       return s.length >= 10 ? s.slice(0, 10) : s;
     };
 
+    // 取当前订单（单调守卫用：已收款订单不可被普通编辑拖回状态/收款信息）
+    const [cur] = await pool.query(
+      'SELECT status, paid_amount, pay_date, receipt_no, handler_finance, pay_method FROM sales_orders WHERE id = ?',
+      [req.params.id]
+    );
+    if (cur.length === 0) return fail(res, '订单不存在');
+    const curRow = cur[0];
+
     // 状态自动流转（赊账中间态：部分付款=赊账中，足额=已收款）
     // pay_date+paid>=total → 已收款(已完成)；pay_date+0<paid<total → 赊账中；仅发货 → 已发货；否则新建
     const paid = (paid_amount !== undefined && paid_amount !== null) ? Number(paid_amount) : 0;
     const total = qty ? qty * Number(unit_price) : 0;
-    let status = '新建';
+    let derived = '新建';
     if (pay_date && paid > 0) {
-      status = paid >= total ? '已收款' : '赊账中';
+      derived = paid >= total ? '已收款' : '赊账中';
     } else if (actual_ship_date && ship_no) {
-      status = '已发货';
+      derived = '已发货';
     }
+
+    // 单调守卫：已收款订单经普通编辑若被推导回非已收款（误改收款信息/清收款日等）→ 状态保持已收款，
+    // 且收款相关字段（paid_amount/pay_date/receipt_no/handler_finance/pay_method）锁回 DB 原值，
+    // 防止出现"status=已收款 但 paid<total"的自相矛盾脏数据。要回退须走显式反结 PUT /:id/reopen。
+    const locked = curRow.status === '已收款' && derived !== '已收款';
+    const status = locked ? '已收款' : derived;
+    const finalPaidAmount = locked ? curRow.paid_amount : (paid_amount || null);
+    const finalPayDate = locked ? curRow.pay_date : normDate(pay_date);
+    const finalReceiptNo = locked ? curRow.receipt_no : (receipt_no || null);
+    const finalHandlerFinance = locked ? curRow.handler_finance : (handler_finance || null);
+    const finalPayMethod = locked ? curRow.pay_method : (pay_method || null);
 
     const total_amount = qty ? qty * Number(unit_price) : undefined;
 
@@ -203,14 +222,27 @@ router.put(
        WHERE id=?`,
       [customer, door_bom_id, color, qty, unit_price, total_amount,
        normDate(actual_ship_date), ship_no || null, handler_ship || null,
-       normDate(pay_date), receipt_no || null, handler_finance || null, paid_amount || null,
+       finalPayDate, finalReceiptNo, finalHandlerFinance, finalPaidAmount,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
        remark || null, edge_band || null, frame_line || null,
-       customer_type || null, address || null, hardware || null, pay_method || null,
+       customer_type || null, address || null, hardware || null, finalPayMethod,
        salesperson || null, installer || null, biz_fee || null,
        status, req.params.id]
     );
-    ok(res, { status }, '更新成功');
+    ok(res, { status }, locked ? '已完成订单收款信息已锁定，状态保持已收款（如需修正请反结）' : '更新成功');
+  })
+);
+
+// 反结：已收款订单显式回退到赊账中（保留已付金额，回到可重新核对收款的状态）
+// 仅已收款可反结；防误操作的状态回退统一收口到此显式入口，普通 PUT 不回退已收款
+router.put(
+  '/:id/reopen',
+  wrap(async (req, res) => {
+    const [cur] = await pool.query('SELECT status FROM sales_orders WHERE id = ?', [req.params.id]);
+    if (cur.length === 0) return fail(res, '订单不存在');
+    if (cur[0].status !== '已收款') return fail(res, '仅"已收款"订单可反结');
+    await pool.query("UPDATE sales_orders SET status='赊账中' WHERE id = ?", [req.params.id]);
+    ok(res, { status: '赊账中' }, '已反结，回到赊账中，可重新核对收款');
   })
 );
 
