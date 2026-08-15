@@ -19,7 +19,7 @@ router.get(
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { status, order_no, customer, startDate, endDate, page = 1, pageSize = 20 } = req.query;
+    const { status, order_no, customer, startDate, endDate, ids, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (status) { where.push('cl.status = ?'); params.push(status); }
@@ -27,6 +27,14 @@ router.get(
     if (customer) { where.push('so.customer LIKE ?'); params.push(`%${customer}%`); }
     if (startDate) { where.push('cl.created_at >= ?'); params.push(startDate); }
     if (endDate) { where.push('cl.created_at <= ?'); params.push(endDate); }
+    // ARE-112：按 id 批量取数（打印单张/台账共用）
+    if (ids) {
+      const idArr = String(ids).split(',').map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+      if (idArr.length) {
+        where.push(`cl.id IN (${idArr.map(() => '?').join(',')})`);
+        params.push(...idArr);
+      }
+    }
     const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const total = (await pool.query(`SELECT COUNT(*) c FROM cutting_list cl LEFT JOIN sales_orders so ON so.id = cl.order_id ${clause}`, params))[0][0].c;
     const rows = (

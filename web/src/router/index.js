@@ -4,6 +4,8 @@ import { menuList } from './menu'
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('../views/login.vue') },
+  // ARE-112：打印专用页，顶层路由（脱离 layout，无侧栏/导航），登录后任意角色可访问
+  { path: '/cutting-list/print', name: 'cutting-list-print', component: () => import('../views/cuttingListPrint.vue'), meta: { title: '下料单打印' } },
   {
     path: '/',
     component: () => import('../layout/index.vue'),
