@@ -15,19 +15,32 @@ router.get(
   })
 );
 
-// 加工备注标签联想：全量去重数组（静态路径，须在 /:id 之前声明）
+// 加工备注标签联想：近期 N 条下料单 remark_tags 去重（近期优先：最近用过的排前）
+// 静态路径，须在 /:id 之前声明，否则被参数路由吞
 router.get(
   '/tags',
   wrap(async (req, res) => {
-    const [rows] = await pool.query("SELECT remark_tags FROM cutting_list WHERE remark_tags IS NOT NULL AND remark_tags != ''");
-    const set = new Set();
+    const TAG_SAMPLE = 500; // 近期 500 条下料单取标签，去重后通常几十个，<50KB 无卡顿
+    const [rows] = await pool.query(
+      "SELECT remark_tags FROM cutting_list WHERE remark_tags IS NOT NULL AND remark_tags != '' ORDER BY created_at DESC LIMIT ?",
+      [TAG_SAMPLE]
+    );
+    const seen = new Set();
+    const list = [];
     for (const row of rows) {
       try {
         const arr = JSON.parse(row.remark_tags);
-        if (Array.isArray(arr)) arr.forEach((s) => { if (typeof s === 'string' && s) set.add(s); });
+        if (Array.isArray(arr)) {
+          for (const s of arr) {
+            if (typeof s === 'string' && s && !seen.has(s)) {
+              seen.add(s);
+              list.push(s);
+            }
+          }
+        }
       } catch {}
     }
-    ok(res, [...set].sort());
+    ok(res, list);
   })
 );
 
