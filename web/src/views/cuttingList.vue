@@ -101,7 +101,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="墙厚"><el-input :model-value="editRow?.wall_thickness" disabled /></el-form-item>
+            <el-form-item label="墙厚"><el-input :model-value="editRow?.wall_thick" disabled /></el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="经手人"><el-input v-model="editForm.handler" /></el-form-item>

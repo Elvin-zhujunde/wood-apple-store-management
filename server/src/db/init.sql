@@ -102,6 +102,14 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   installer          VARCHAR(50)  NULL COMMENT '安装师傅',
   biz_fee            DECIMAL(10,2) NULL COMMENT '业务费',
   status             ENUM('新建','已发货','赊账中','已收款') NOT NULL DEFAULT '新建' COMMENT '新建→已发货→赊账中(部分付款)→已收款(足额=已完成)',
+  -- 下料相关字段（原 cutting_list 表合并进来，门洞 door_h/door_w/wall_thick 订单本就有不重复）
+  cut_door_height    DECIMAL(8,2) NULL COMMENT '门扇高(mm) 固化值(普通=洞高-默认高扣减)',
+  cut_door_width     DECIMAL(8,2) NULL COMMENT '门扇宽(mm) 固化值(普通=洞宽-默认宽扣减)',
+  cut_mode           TINYINT NULL DEFAULT 1 COMMENT '下料模式 1普通自动扣尺 2特殊手动录入(NULL=未下料)',
+  cut_status         VARCHAR(10) NULL COMMENT '下料状态(待下料/已下料,NULL=未下料)',
+  cut_date           DATE NULL COMMENT '下料日期',
+  cut_handler        VARCHAR(50) NULL COMMENT '下料经手人',
+  cut_remark_tags    TEXT NULL COMMENT '下料加工备注标签(JSON.stringify 字符串数组)',
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_bom FOREIGN KEY (door_bom_id) REFERENCES door_bom(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售订单';
@@ -172,26 +180,7 @@ CREATE TABLE IF NOT EXISTS purchase_suggestion (
   CONSTRAINT fk_sug_order    FOREIGN KEY (order_id) REFERENCES sales_orders(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购建议';
 
--- ============================================================
--- 10. 下料单表（ARE-110：与订单 1:1，沿用订单号无独立编号，尺寸快照+固化值）
--- ============================================================
-CREATE TABLE IF NOT EXISTS cutting_list (
-  id            INT AUTO_INCREMENT PRIMARY KEY,
-  order_id      INT NOT NULL COMMENT '关联销售订单(单号沿用订单号)',
-  hole_height   DECIMAL(8,2) NOT NULL COMMENT '门洞高(mm) 快照',
-  hole_width    DECIMAL(8,2) NOT NULL COMMENT '门洞宽(mm) 快照',
-  wall_thickness DECIMAL(6,2) DEFAULT NULL COMMENT '墙厚(mm) 快照',
-  door_height   DECIMAL(8,2) NOT NULL COMMENT '门扇高(mm) 固化值(普通=洞高-默认高扣减)',
-  door_width    DECIMAL(8,2) NOT NULL COMMENT '门扇宽(mm) 固化值(普通=洞宽-默认宽扣减)',
-  mode          TINYINT NOT NULL DEFAULT 1 COMMENT '1普通自动扣尺 2特殊手动录入',
-  status        ENUM('待下料','已下料') NOT NULL DEFAULT '待下料',
-  handler       VARCHAR(50) DEFAULT NULL COMMENT '经手人',
-  remark_tags   TEXT DEFAULT NULL COMMENT '加工备注标签(JSON.stringify 字符串数组,如["合页3个","喷漆偏深"])',
-  cut_date      DATE DEFAULT NULL COMMENT '下料日期',
-  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_cut_order (order_id) COMMENT '一单一单:一订单一下料单',
-  CONSTRAINT fk_cut_order FOREIGN KEY (order_id) REFERENCES sales_orders(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下料单';
+-- 10. 下料单表已合并进 sales_orders（cut_door_height/cut_door_width/cut_mode/cut_status/cut_date/cut_handler/cut_remark_tags），原 cutting_list 表删除
 
 -- ============================================================
 -- 11. 业务图片附件表（独立泛化关联，DB只存相对路径，前缀前端拼）
