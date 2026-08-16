@@ -26,9 +26,13 @@ const storage = multer.diskStorage({
     const d = new Date();
     const ts = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`;
     const rand = Math.random().toString(36).slice(2, 8);
-    // 取原扩展名，统一小写
     const ext = (path.extname(file.originalname) || '.jpg').toLowerCase();
-    cb(null, `${ts}-${rand}${ext}`);
+    // 方案A：客户名+子客户名+时间戳（query 传入，multer filename 回调早于 body 解析）
+    const sanitize = (s) => (s || '').replace(/[\\/:*?"<>|\s]/g, '_').slice(0, 50);
+    const cust = sanitize(req.query.customer_name);
+    const loc = sanitize(req.query.location_name);
+    const prefix = cust && loc ? `${cust}-${loc}-` : (cust ? `${cust}-` : '');
+    cb(null, `${prefix}${ts}-${rand}${ext}`);
   },
 });
 
