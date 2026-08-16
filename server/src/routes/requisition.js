@@ -24,7 +24,7 @@ router.get(
     const total = (await pool.query(`SELECT COUNT(*) c FROM material_requisition mr JOIN sales_orders so ON so.id = mr.order_id ${clause}`, params))[0][0].c;
     const rows = (
       await pool.query(
-        `SELECT mr.*, m.name AS material_name, m.code, m.spec, m.unit,
+        `SELECT mr.*, m.name AS material_name, m.code, m.spec, m.unit, m.unit_price,
                 so.order_no, so.customer
            FROM material_requisition mr
            JOIN materials m ON m.id = mr.material_id
@@ -91,7 +91,7 @@ router.get(
   '/:id',
   wrap(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT mr.*, m.name AS material_name, m.code, m.spec, m.unit, so.order_no
+      `SELECT mr.*, m.name AS material_name, m.code, m.spec, m.unit, m.unit_price, so.order_no
          FROM material_requisition mr
          JOIN materials m ON m.id = mr.material_id
          JOIN sales_orders so ON so.id = mr.order_id

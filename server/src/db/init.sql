@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS materials (
   safety_stock  DECIMAL(14,3) NOT NULL DEFAULT 0 COMMENT '最低安全库存',
   origin_place  VARCHAR(100) NULL COMMENT '生产地(如江西赣州)',
   manufacturer  VARCHAR(100) NULL COMMENT '厂家名',
+  unit_price    DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '物料参考单价(非必填,默认0;领料成本计算用)',
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物料档案';
 

@@ -43,7 +43,7 @@ router.get(
 router.get(
   '/all',
   wrap(async (req, res) => {
-    const [rows] = await pool.query('SELECT id, code, name, category, spec, unit, stock_qty, origin_place, manufacturer FROM materials ORDER BY id');
+    const [rows] = await pool.query('SELECT id, code, name, category, spec, unit, stock_qty, safety_stock, origin_place, manufacturer, unit_price FROM materials ORDER BY id');
     ok(res, rows);
   })
 );
@@ -62,12 +62,12 @@ router.get(
 router.post(
   '/',
   wrap(async (req, res) => {
-    const { code, name, category, spec, unit, safety_stock = 0, origin_place, manufacturer } = req.body;
+    const { code, name, category, spec, unit, safety_stock = 0, origin_place, manufacturer, unit_price = 0 } = req.body;
     if (!code || !name || !category || !spec || !unit) return fail(res, '编码/名称/分类/规格/单位 必填');
     try {
       const [r] = await pool.query(
-        'INSERT INTO materials (code, name, category, spec, unit, safety_stock, origin_place, manufacturer) VALUES (?,?,?,?,?,?,?,?)',
-        [code, name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null]
+        'INSERT INTO materials (code, name, category, spec, unit, safety_stock, origin_place, manufacturer, unit_price) VALUES (?,?,?,?,?,?,?,?,?)',
+        [code, name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null, Number(unit_price) || 0]
       );
       ok(res, { id: r.insertId }, '新增成功');
     } catch (e) {
@@ -81,10 +81,10 @@ router.post(
 router.put(
   '/:id',
   wrap(async (req, res) => {
-    const { name, category, spec, unit, safety_stock, origin_place, manufacturer } = req.body;
+    const { name, category, spec, unit, safety_stock, origin_place, manufacturer, unit_price = 0 } = req.body;
     await pool.query(
-      'UPDATE materials SET name=?, category=?, spec=?, unit=?, safety_stock=?, origin_place=?, manufacturer=? WHERE id=?',
-      [name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null, req.params.id]
+      'UPDATE materials SET name=?, category=?, spec=?, unit=?, safety_stock=?, origin_place=?, manufacturer=?, unit_price=? WHERE id=?',
+      [name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null, Number(unit_price) || 0, req.params.id]
     );
     ok(res, null, '更新成功');
   })

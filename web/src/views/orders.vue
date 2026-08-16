@@ -340,6 +340,29 @@
           </el-form>
         </el-tab-pane>
 
+        <el-tab-pane v-if="isEdit" label="领料·成本" name="req">
+          <el-alert v-if="reqList.length === 0" type="info" :closable="false" style="margin-bottom:12px">该订单暂无关联领料记录，材料成本为 0</el-alert>
+          <template v-else>
+            <el-table :data="reqList" border size="small">
+              <el-table-column prop="code" label="编码" width="100" />
+              <el-table-column prop="material_name" label="物料" min-width="140" />
+              <el-table-column prop="spec" label="规格" min-width="120" />
+              <el-table-column prop="unit" label="单位" width="70" />
+              <el-table-column prop="qty" label="领用数量" width="100" align="right" />
+              <el-table-column prop="unit_price" label="单价" width="90" align="right" />
+              <el-table-column label="小计" width="100" align="right">
+                <template #default="{ row }">{{ reqLineTotal(row) }}</template>
+              </el-table-column>
+              <el-table-column prop="req_date" label="领料日" width="110" />
+              <el-table-column prop="handler" label="经手人" width="80" />
+            </el-table>
+            <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+              <span class="muted">共 {{ reqList.length }} 条领料</span>
+              <span>材料成本合计：<strong style="color:#f56c6c;font-size:16px">{{ reqTotalCost }}</strong> 元</span>
+            </div>
+          </template>
+        </el-tab-pane>
+
         <el-tab-pane v-if="isEdit" label="图片附件" name="images">
           <el-alert type="info" :closable="false" style="margin-bottom:12px">可上传客户确认图、合同、发货实拍等。图片非必填。</el-alert>
           <ImageUpload v-model="imgList" entity-type="order" :entity-id="form.id" />
@@ -357,7 +380,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { orderApi, bomApi, attachmentApi, cuttingApi } from '../api'
+import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../store/user'
@@ -419,6 +442,15 @@ const balanceDue = computed(() => {
 })
 // 已收款订单收款信息锁定（防误操作拖回状态）；反结入口在收款 tab
 const payLocked = computed(() => form.value.status === '已收款')
+
+// 领料·成本 tab：关联领料明细 + 材料成本合计（口径A：按当前物料参考单价实时算）
+const reqList = ref([])
+const reqTotalCost = computed(() =>
+  Math.round(reqList.value.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.unit_price) || 0), 0) * 100) / 100
+)
+function reqLineTotal(row) {
+  return Math.round((Number(row.qty) || 0) * (Number(row.unit_price) || 0) * 100) / 100
+}
 
 // 反结：已收款 → 赊账中（保留已付金额，回到可重新核对收款的状态）
 async function onReopen() {
@@ -554,6 +586,12 @@ async function openEdit(row) {
   try {
     const r = await attachmentApi.list('order', row.id)
     imgList.value = r.data
+  } catch (e) {}
+  // 加载关联领料（材料成本展示）
+  reqList.value = []
+  try {
+    const rr = await requisitionApi.list({ order_id: row.id, pageSize: 200 })
+    reqList.value = rr.data.list || []
   } catch (e) {}
   dlgVisible.value = true
 }

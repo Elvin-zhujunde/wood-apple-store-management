@@ -17,6 +17,7 @@
       <el-table-column prop="unit" label="单位" width="70" />
       <el-table-column prop="stock_qty" label="当前库存" width="100" align="right" />
       <el-table-column prop="safety_stock" label="安全库存" width="100" align="right" />
+      <el-table-column prop="unit_price" label="参考单价" width="100" align="right" />
       <el-table-column prop="origin_place" label="生产地" min-width="100" />
       <el-table-column prop="manufacturer" label="厂家" min-width="100" />
       <el-table-column label="操作" width="130" fixed="right">
@@ -51,6 +52,10 @@
         <el-form-item label="生产地"><el-input v-model="form.origin_place" placeholder="如 江西赣州" /></el-form-item>
         <el-form-item label="厂家名"><el-input v-model="form.manufacturer" placeholder="如 XX板材厂" /></el-form-item>
         <el-form-item label="安全库存"><el-input-number v-model="form.safety_stock" :min="0" :precision="3" style="width:100%" /></el-form-item>
+        <el-form-item label="参考单价">
+          <el-input-number v-model="form.unit_price" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="非必填,默认0" />
+          <div class="muted">领料材料成本计算依据；价格变动可新建"XX-8月涨价版"档案区分</div>
+        </el-form-item>
         <el-form-item v-if="isEdit" label="物料图片">
           <ImageUpload v-model="imgList" entity-type="material" :entity-id="form.id" />
         </el-form-item>
@@ -88,7 +93,7 @@ async function load() {
 
 function openAdd() {
   isEdit.value = false
-  form.value = { code: '', name: '', category: '主材', spec: '', unit: '', safety_stock: 0, origin_place: '', manufacturer: '' }
+  form.value = { code: '', name: '', category: '主材', spec: '', unit: '', safety_stock: 0, origin_place: '', manufacturer: '', unit_price: 0 }
   dlgVisible.value = true
 }
 
