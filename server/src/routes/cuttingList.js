@@ -96,7 +96,7 @@ router.get(
       [req.params.id]
     );
     if (rows.length === 0) return fail(res, '订单不存在');
-    if (!rows[0].status) return fail(res, '该订单未生成下料单');
+    if (!rows[0].status) return fail(res, '该订单未下料');
     ok(res, rows[0]);
   })
 );
@@ -106,7 +106,7 @@ router.get(
 router.post(
   '/',
   wrap(async (req, res) => {
-    const { order_id, mode = 1, door_height, door_width, handler, remark_tags } = req.body;
+    const { order_id, mode = 1, door_height, door_width, handler, remark_tags, cut_date } = req.body;
     if (!order_id) return fail(res, '缺少订单 id');
     const [orders] = await pool.query(
       'SELECT id, door_h, door_w, wall_thick, cut_status FROM sales_orders WHERE id = ?',
@@ -114,7 +114,7 @@ router.post(
     );
     if (orders.length === 0) return fail(res, '订单不存在');
     const o = orders[0];
-    if (o.cut_status) return fail(res, '该订单已有下料单，不可重复生成');
+    if (o.cut_status) return fail(res, '该订单已下料，不可重复生成');
     if (o.door_h == null || o.door_w == null) return fail(res, '订单未录门洞尺寸，无法生成下料单');
 
     let finalDoorH, finalDoorW;
@@ -127,45 +127,37 @@ router.post(
       finalDoorW = Number(o.door_w) - Number(config.cutting.defaultWidthCut);
     }
 
+    // 状态模型=未下料(NULL)/已下料，生成即"已下料"；cut_date 未传则取当天(CURDATE)，下料日期随生成一并落库
     await pool.query(
       `UPDATE sales_orders SET
-        cut_door_height=?, cut_door_width=?, cut_mode=?, cut_status='待下料',
-        cut_handler=?, cut_remark_tags=?
+        cut_door_height=?, cut_door_width=?, cut_mode=?, cut_status='已下料',
+        cut_date=COALESCE(?, CURDATE()), cut_handler=?, cut_remark_tags=?
        WHERE id=?`,
-      [finalDoorH, finalDoorW, Number(mode) === 2 ? 2 : 1, handler || null, remark_tags || null, order_id]
+      [finalDoorH, finalDoorW, Number(mode) === 2 ? 2 : 1, cut_date || null, handler || null, remark_tags || null, order_id]
     );
-    ok(res, { id: order_id }, '下料单已生成');
+    ok(res, { id: order_id }, '下料单已生成（已下料）');
   })
 );
 
-// 编辑（师傅微调门扇尺寸 + 状态流转 待下料→已下料填 cut_date）
+// 编辑（师傅微调门扇尺寸/下料日期/经手人/加工备注；状态恒为"已下料"，无中间态）
 router.put(
   '/:id',
   wrap(async (req, res) => {
-    const { door_height, door_width, status, cut_date, handler, remark_tags } = req.body;
+    const { door_height, door_width, cut_date, handler, remark_tags } = req.body;
     const [rows] = await pool.query('SELECT cut_status, cut_door_height, cut_door_width, cut_remark_tags, cut_date, cut_handler FROM sales_orders WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return fail(res, '订单不存在');
     const o = rows[0];
-    if (!o.cut_status) return fail(res, '该订单未生成下料单');
-
-    let finalStatus = o.cut_status;
-    if (status === '已下料') {
-      if (!cut_date) return fail(res, '标记已下料需填下料日期');
-      finalStatus = '已下料';
-    } else if (status === '待下料') {
-      finalStatus = '待下料';
-    }
+    if (!o.cut_status) return fail(res, '该订单未下料');
 
     const finalTags = remark_tags === undefined ? o.cut_remark_tags : remark_tags || null;
 
     await pool.query(
       `UPDATE sales_orders SET
-        cut_door_height=?, cut_door_width=?, cut_status=?, cut_date=?, cut_handler=?, cut_remark_tags=?
+        cut_door_height=?, cut_door_width=?, cut_date=?, cut_handler=?, cut_remark_tags=?
        WHERE id=?`,
       [
         door_height != null ? Number(door_height) : o.cut_door_height,
         door_width != null ? Number(door_width) : o.cut_door_width,
-        finalStatus,
         cut_date || o.cut_date,
         handler || o.cut_handler,
         finalTags,
@@ -187,7 +179,7 @@ router.delete(
        WHERE id=? AND cut_status IS NOT NULL`,
       [req.params.id]
     );
-    if (r.affectedRows === 0) return fail(res, '下料单不存在');
+    if (r.affectedRows === 0) return fail(res, '该订单未下料');
     ok(res, null, '已删除下料单（订单保留）');
   })
 );

@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   cut_door_height    DECIMAL(8,2) NULL COMMENT '门扇高(mm) 固化值(普通=洞高-默认高扣减)',
   cut_door_width     DECIMAL(8,2) NULL COMMENT '门扇宽(mm) 固化值(普通=洞宽-默认宽扣减)',
   cut_mode           TINYINT NULL DEFAULT 1 COMMENT '下料模式 1普通自动扣尺 2特殊手动录入(NULL=未下料)',
-  cut_status         VARCHAR(10) NULL COMMENT '下料状态(待下料/已下料,NULL=未下料)',
+  cut_status         VARCHAR(10) NULL COMMENT '下料状态(已下料,NULL=未下料;生成即已下料,无待下料中间态)',
   cut_date           DATE NULL COMMENT '下料日期',
   cut_handler        VARCHAR(50) NULL COMMENT '下料经手人',
   cut_remark_tags    TEXT NULL COMMENT '下料加工备注标签(JSON.stringify 字符串数组)',

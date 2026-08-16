@@ -288,9 +288,14 @@
               <div class="muted">= 门洞宽 {{ cutRow?.door_w }} − {{ cutConfig.defaultWidthCut }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="12">
             <el-form-item label="经手人">
               <el-input v-model="cutForm.handler" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="下料日期" required>
+              <el-date-picker v-model="cutForm.cut_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -596,9 +601,9 @@ function agingStyle(days) {
 function statusType(s) {
   return { 新建: 'info', 已发货: 'warning', 赊账中: 'danger', 已收款: 'success' }[s] || 'info'
 }
-// 下料单状态配色（待下料=warning橙, 已下料=success绿）
+// 下料单状态配色（已下料=success绿；未下料在列表由 v-else 兜底显示灰字，不进此函数）
 function cutStatusType(s) {
-  return { 待下料: 'warning', 已下料: 'success' }[s] || 'info'
+  return { 已下料: 'success' }[s] || 'info'
 }
 
 // 批量：选中行中可发货/可收款的数量（后端也会做幂等校验，此处用于按钮可用性与提示）
@@ -866,6 +871,7 @@ async function openCutting(row) {
     door_height: Number(row.door_h) - Number(cutConfig.value.defaultHeightCut),
     door_width: Number(row.door_w) - Number(cutConfig.value.defaultWidthCut),
     handler: store.name,
+    cut_date: todayLocal(),
     tags: [],
   }
   cuttingVisible.value = true
@@ -877,14 +883,16 @@ async function onCutting() {
   if (!f.door_height || !f.door_width) {
     return ElMessage.warning('门扇高/宽必填')
   }
+  if (!f.cut_date) return ElMessage.warning('请填下料日期')
   await cuttingApi.create({
     order_id: r.id,
     door_height: f.door_height,
     door_width: f.door_width,
     handler: f.handler,
+    cut_date: f.cut_date,
     remark_tags: JSON.stringify(f.tags),
   })
-  ElMessage.success('下料单已生成')
+  ElMessage.success('下料单已生成（已下料）')
   cuttingVisible.value = false
 }
 
