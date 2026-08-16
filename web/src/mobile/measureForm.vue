@@ -7,9 +7,9 @@
 
     <!-- 第①步 客户 -->
     <div v-if="step===0">
-      <van-search v-model="custKw" placeholder="搜索客户" @search="searchCust" />
+      <van-search v-model="custKw" placeholder="搜索客户" />
       <van-cell-group>
-        <van-cell v-for="c in custList" :key="c.id" :title="c.name" :label="c.customer_type" is-link @click="pickCust(c)">
+        <van-cell v-for="c in filteredCust" :key="c.id" :title="c.name" :label="c.customer_type" is-link @click="pickCust(c)">
           <template #right-icon><van-icon v-if="form.customer_id===c.id" name="success" color="#07c160" /></template>
         </van-cell>
       </van-cell-group>
@@ -18,9 +18,9 @@
 
     <!-- 第②步 定位 -->
     <div v-if="step===1">
-      <van-field v-model="locKw" placeholder="搜索或输入新定位" @input="searchLoc" />
+      <van-field v-model="locKw" placeholder="搜索或输入新定位" />
       <van-cell-group>
-        <van-cell v-for="l in locList" :key="l.id" :title="l.name" is-link @click="pickLoc(l)">
+        <van-cell v-for="l in filteredLoc" :key="l.id" :title="l.name" is-link @click="pickLoc(l)">
           <template #right-icon><van-icon v-if="form.location_id===l.id" name="success" color="#07c160" /></template>
         </van-cell>
       </van-cell-group>
@@ -62,7 +62,7 @@
   </div>
 </template>
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
 import { customerApi, measureApi, attachmentApi } from '../api/index'
@@ -76,10 +76,10 @@ const photos = ref([])
 const submitting = ref(false)
 
 onMounted(async () => { const { data } = await customerApi.all(); custList.value = data })
-const searchCust = () => {}
 const pickCust = (c) => { form.customer_id = c.id; form.customer_name = c.name; form.location_id = null; form.location_name = ''; locKw.value = ''; step.value = 1; loadLoc() }
 const loadLoc = async () => { if (!form.customer_id) return; const { data } = await customerApi.locations(form.customer_id); locList.value = data }
-const searchLoc = () => { /* 已全量加载，前端过滤或后端搜；这里简化全量 */ }
+const filteredCust = computed(() => custKw.value ? custList.value.filter(c => c.name.includes(custKw.value)) : custList.value)
+const filteredLoc = computed(() => locKw.value ? locList.value.filter(l => l.name.includes(locKw.value)) : locList.value)
 const pickLoc = (l) => { form.location_id = l.id; form.location_name = l.name }
 const createLoc = async () => {
   const { data } = await customerApi.addLocation(form.customer_id, { name: locKw.value })

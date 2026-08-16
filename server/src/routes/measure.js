@@ -69,8 +69,8 @@ router.get(
        FROM measure_records m
        LEFT JOIN customers c ON c.id = m.customer_id
        LEFT JOIN customer_locations l ON l.id = m.location_id
-       WHERE m.id = ?`,
-      [req.params.id]
+       WHERE m.id = ? AND (m.measured_by = ? OR ? = 'boss')`,
+      [req.params.id, req.user.name, req.user.role]
     );
     if (rows.length === 0) return fail(res, '测量记录不存在');
     const [photos] = await pool.query(
