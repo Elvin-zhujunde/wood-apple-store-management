@@ -103,4 +103,83 @@ router.get(
   })
 );
 
+// 批量领料：一个物料总量分给多笔订单（一次弹窗提交 N 条领料记录）
+// 单事务：校验总量≤库存→扣总量一次库存→写N条material_requisition(各自req_no)→1条汇总inventory_log流水→批末安全库存检查
+// items:[{order_id,qty}] 共享 material_id/req_date/handler
+router.post(
+  '/batch',
+  wrap(async (req, res) => {
+    const { material_id, req_date, handler, items } = req.body;
+    if (!material_id || !req_date || !handler) return fail(res, '物料/领用日期/经手人 必填');
+    if (!Array.isArray(items) || items.length === 0) return fail(res, '缺少领料明细');
+    for (const it of items) {
+      if (!it.order_id || !Number(it.qty) || Number(it.qty) <= 0)
+        return fail(res, '每条明细需含订单id与正数数量');
+    }
+    const totalQty = items.reduce((s, it) => s + Number(it.qty), 0);
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [mats] = await conn.query('SELECT stock_qty, name FROM materials WHERE id = ?', [material_id]);
+      if (mats.length === 0) { await conn.rollback(); return fail(res, '物料不存在'); }
+      if (Number(mats[0].stock_qty) < totalQty) {
+        await conn.rollback();
+        return fail(res, `库存不足，当前剩余 ${mats[0].stock_qty}，需 ${totalQty}`);
+      }
+      // 校验订单存在
+      const orderIds = items.map((it) => Number(it.order_id));
+      const [ordRows] = await conn.query(
+        `SELECT id FROM sales_orders WHERE id IN (${orderIds.map(() => '?').join(',')})`,
+        orderIds
+      );
+      if (ordRows.length !== orderIds.length) {
+        await conn.rollback();
+        const found = new Set(ordRows.map((r) => r.id));
+        const missing = orderIds.filter((id) => !found.has(id));
+        return fail(res, `订单不存在：${missing.join(',')}`);
+      }
+
+      const results = [];
+      const reqNos = [];
+      for (const it of items) {
+        const req_no = await genDocNo('material_requisition', 'LL', 'req', conn);
+        const [r] = await conn.query(
+          `INSERT INTO material_requisition (req_no, order_id, material_id, qty, req_date, handler)
+           VALUES (?,?,?,?,?,?)`,
+          [req_no, Number(it.order_id), material_id, Number(it.qty), req_date, handler]
+        );
+        results.push({ order_id: Number(it.order_id), req_no, qty: Number(it.qty), ok: true });
+        reqNos.push(req_no);
+      }
+      // 一次扣总量库存（减少并发冲突，优于逐条减）
+      await conn.query('UPDATE materials SET stock_qty = stock_qty - ? WHERE id = ?', [totalQty, material_id]);
+      // 1 条汇总流水（明细已在 material_requisition 留痕，流水不膨胀）
+      const summaryRef = reqNos[0] + (reqNos.length > 1 ? ` 等${reqNos.length}单` : '');
+      await conn.query(
+        'INSERT INTO inventory_log (material_id, change_type, qty, ref_no, operator) VALUES (?, ?, ?, ?, ?)',
+        [material_id, 'out', totalQty, summaryRef, req.user.name]
+      );
+      await conn.commit();
+
+      // 批末安全库存检查（事务外，失败不影响领料）
+      let suggestion = null;
+      try {
+        suggestion = await checkSafetyStock(material_id, req.user.name);
+      } catch (e) {
+        console.error('安全库存检查失败:', e.message);
+      }
+      const msg = suggestion && suggestion.action === 'created'
+        ? `批量领料完成：${results.length} 单，库存已减少；${suggestion.name} 库存 ${suggestion.stock_qty} ≤ 安全库存 ${suggestion.safety_stock}，已生成采购建议`
+        : `批量领料完成：${results.length} 单，库存已减少`;
+      ok(res, { results, success: results.length, total_qty: totalQty, suggestion }, msg);
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  })
+);
+
 module.exports = router;

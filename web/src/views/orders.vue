@@ -27,34 +27,36 @@
       <el-button type="warning" :disabled="selectedRows.length === 0" @click="openBatchPrint">打印下料单 ({{ selectedRows.length }})</el-button>
       <el-button type="success" :disabled="selectedRows.length === 0" @click="openBatchLabel">标签打印 ({{ selectedRows.length }})</el-button>
       <el-button type="primary" :disabled="batchCuttableCount === 0" @click="openBatchCut">批量下料 ({{ batchCuttableCount }})</el-button>
+      <el-button type="info" :disabled="selectedRows.length < 2" @click="openBatchReq">批量领料 ({{ selectedRows.length }})</el-button>
+      <ColumnSettings :columns="allColumns" storage-key="orders-cols" @change="(v) => (visibleCols = v)" />
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
       <el-table-column type="selection" width="42" />
-      <el-table-column prop="order_no" label="订单号" width="160" />
-      <el-table-column prop="customer" label="客户" min-width="120" />
-      <el-table-column label="尺寸(高×宽)" width="150">
+      <el-table-column v-if="colVisible('order_no')" prop="order_no" label="订单号" width="160" />
+      <el-table-column v-if="colVisible('customer')" prop="customer" label="客户" min-width="120" />
+      <el-table-column v-if="colVisible('size')" label="尺寸(高×宽)" width="150">
         <template #default="{ row }">
           <span v-if="row.door_h || row.door_w">{{ row.door_h || '-' }}×{{ row.door_w || '-' }}</span>
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="wall_thick" label="墙厚" width="90" align="center">
+      <el-table-column v-if="colVisible('wall_thick')" prop="wall_thick" label="墙厚" width="90" align="center">
         <template #default="{ row }">{{ row.wall_thick != null ? row.wall_thick : '-' }}</template>
       </el-table-column>
-      <el-table-column label="门扇(高×宽)" width="150">
+      <el-table-column v-if="colVisible('cut_door')" label="门扇(高×宽)" width="150">
         <template #default="{ row }">
           <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ row.cut_door_height }}×{{ row.cut_door_width }}</span>
           <span v-else class="muted">未下料</span>
         </template>
       </el-table-column>
-      <el-table-column label="下料状态" width="90">
+      <el-table-column v-if="colVisible('cut_status')" label="下料状态" width="90">
         <template #default="{ row }">
           <el-tag v-if="row.cut_status" :type="cutStatusType(row.cut_status)" size="small">{{ row.cut_status }}</el-tag>
           <span v-else class="muted">未下料</span>
         </template>
       </el-table-column>
-      <el-table-column prop="cut_date" label="下料日" width="110" :formatter="dateFmt" />
-      <el-table-column label="加工备注" min-width="120">
+      <el-table-column v-if="colVisible('cut_date')" prop="cut_date" label="下料日" width="110" :formatter="dateFmt" />
+      <el-table-column v-if="colVisible('cut_remark_tags')" label="加工备注" min-width="120">
         <template #default="{ row }">
           <span v-if="parseTags(row.cut_remark_tags).length" class="tag-row">
             <el-tag v-for="(t, i) in parseTags(row.cut_remark_tags)" :key="i" size="small" :type="tagType(t)" class="tag-item">{{ t }}</el-tag>
@@ -62,29 +64,65 @@
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="door_bom_name" label="门型" width="120" />
-      <el-table-column prop="color" label="颜色" width="80" />
-      <el-table-column label="应收" width="90" align="right" prop="total_amount" />
-      <el-table-column label="已收" width="90" align="right">
+      <el-table-column v-if="colVisible('sub_customer')" prop="sub_customer" label="子客户" min-width="140">
+        <template #default="{ row }">{{ row.sub_customer || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('lock_hole')" prop="lock_hole" label="锁孔" width="100" align="center">
+        <template #default="{ row }">{{ row.lock_hole || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('door_bom_name')" prop="door_bom_name" label="门型" width="120" />
+      <el-table-column v-if="colVisible('color')" prop="color" label="颜色" width="80" />
+      <el-table-column v-if="colVisible('style')" prop="style" label="款式" width="100">
+        <template #default="{ row }">{{ row.style || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('board')" prop="board" label="门扇板材" width="90" align="center">
+        <template #default="{ row }">{{ row.board || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('total_amount')" label="应收" width="90" align="right" prop="total_amount" />
+      <el-table-column v-if="colVisible('paid_amount')" label="已收" width="90" align="right">
         <template #default="{ row }">{{ row.paid_amount != null ? row.paid_amount : '-' }}</template>
       </el-table-column>
-      <el-table-column label="欠款" width="90" align="right">
+      <el-table-column v-if="colVisible('balance')" label="欠款" width="90" align="right">
         <template #default="{ row }">
           <span v-if="balanceOf(row) > 0" style="color:#f56c6c;font-weight:600">{{ balanceOf(row) }}</span>
           <span v-else-if="row.paid_amount != null" style="color:#67c23a">0</span>
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="handler_sale" label="经手人" width="80" />
-      <el-table-column prop="order_date" label="下单日" width="120" :formatter="dateFmt" />
-      <el-table-column prop="actual_ship_date" label="发货日" width="120" :formatter="dateFmt" />
-      <el-table-column prop="pay_date" label="收款日" width="120" :formatter="dateFmt" />
-      <el-table-column label="状态" width="90">
+      <el-table-column v-if="colVisible('customer_type')" prop="customer_type" label="客户类别" width="90" align="center">
+        <template #default="{ row }">{{ row.customer_type || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('pay_method')" prop="pay_method" label="付款方式" width="90" align="center">
+        <template #default="{ row }">{{ row.pay_method || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('handler_sale')" prop="handler_sale" label="经手人" width="80" />
+      <el-table-column v-if="colVisible('salesperson')" prop="salesperson" label="业务员" width="80">
+        <template #default="{ row }">{{ row.salesperson || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('installer')" prop="installer" label="安装师傅" width="90">
+        <template #default="{ row }">{{ row.installer || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('order_date')" prop="order_date" label="下单日" width="120" :formatter="dateFmt" />
+      <el-table-column v-if="colVisible('actual_ship_date')" prop="actual_ship_date" label="发货日" width="120" :formatter="dateFmt" />
+      <el-table-column v-if="colVisible('ship_no')" prop="ship_no" label="发货单号" width="130">
+        <template #default="{ row }">{{ row.ship_no || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('pay_date')" prop="pay_date" label="收款日" width="120" :formatter="dateFmt" />
+      <el-table-column v-if="colVisible('receipt_no')" prop="receipt_no" label="收据号" width="120">
+        <template #default="{ row }">{{ row.receipt_no || '-' }}</template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('remark')" prop="remark" label="订单备注" min-width="140">
+        <template #default="{ row }">
+          <span v-if="row.remark">{{ row.remark }}</span>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="colVisible('status')" label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="账龄" width="80" align="center">
+      <el-table-column v-if="colVisible('aging')" label="账龄" width="80" align="center">
         <template #default="{ row }">
           <span v-if="agingOf(row) != null" :style="agingStyle(agingOf(row))">{{ agingOf(row) }}天</span>
           <span v-else class="muted">-</span>
@@ -420,6 +458,66 @@
       </template>
     </el-dialog>
 
+    <!-- 批量领料弹窗：一个物料总量分给多笔订单，快捷输入1+3+5+7 -->
+    <el-dialog v-model="batchReqVisible" title="批量领料" width="860px" :close-on-click-modal="false">
+      <el-form :model="batchReqForm" label-width="90px" inline>
+        <el-form-item label="物料" required>
+          <el-select v-model="batchReqForm.material_id" filterable placeholder="选物料(可搜索)" style="width:260px">
+            <el-option v-for="m in materialList" :key="m.id" :label="`${m.code} ${m.name}（库存${m.stock_qty}${m.unit}）`" :value="m.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="总领料量" required>
+          <el-input-number v-model="batchReqForm.total_qty" :min="0" :precision="3" controls-position="right" style="width:150px" placeholder="总量" />
+        </el-form-item>
+        <el-form-item label="领料日期" required>
+          <el-date-picker v-model="batchReqForm.req_date" type="date" value-format="YYYY-MM-DD" style="width:150px" />
+        </el-form-item>
+        <el-form-item label="经手人" required>
+          <el-input v-model="batchReqForm.handler" style="width:120px" />
+        </el-form-item>
+      </el-form>
+      <div class="batch-req-bar">
+        <div class="batch-req-actions">
+          <el-button size="small" type="primary" plain @click="avgFill">① 平均预填</el-button>
+          <el-button size="small" type="primary" plain @click="autoFillRemain">⑦ 自动分配余量</el-button>
+          <span class="batch-req-hint muted">③ 同上按钮逐行复制 · 键盘 Tab/↑↓/Enter 切行</span>
+        </div>
+        <div class="batch-req-sum">
+          已填 <b>{{ filledSum }}</b> / 总量 <b>{{ batchReqForm.total_qty || 0 }}</b>
+          <span v-if="remainQty > 0" class="warn">（剩 {{ remainQty }}）</span>
+          <span v-else-if="remainQty < 0" class="danger">（超 {{ -remainQty }}）</span>
+          <span v-else-if="batchReqForm.total_qty" class="ok">（已齐）</span>
+        </div>
+      </div>
+      <el-table :data="batchReqItems" border size="small" max-height="340">
+        <el-table-column prop="order_no" label="订单号" width="150" />
+        <el-table-column prop="customer" label="客户" min-width="100" />
+        <el-table-column prop="door_bom_name" label="门型" width="100" />
+        <el-table-column prop="size" label="尺寸" width="110" />
+        <el-table-column label="领料数量" width="150">
+          <template #default="{ row, $index }">
+            <el-input
+              :ref="(el) => (qtyInputs[$index] = el)"
+              v-model="row.qty"
+              placeholder="0"
+              @keydown.enter.prevent="onQtyEnter($index)"
+              @keydown="onQtyKeydown($event, $index)"
+              style="width:120px"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="同上" width="70" align="center">
+          <template #default="{ $index }">
+            <el-button link size="small" :disabled="$index === 0" @click="copyPrev($index)" title="复制上一行数量">⎘</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="batchReqVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!canSubmitBatchReq" @click="onBatchReq">确认领料</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 标签打印选择弹窗：4 种标签类型 -->
     <el-dialog v-model="labelVisible" title="标签打印" width="520px" :close-on-click-modal="false">
       <el-alert type="info" :closable="false" style="margin-bottom:12px">
@@ -601,13 +699,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi } from '../api'
+import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../store/user'
 import ImageUpload from '../components/ImageUpload.vue'
 import TagInput from '../components/TagInput.vue'
+import ColumnSettings from '../components/ColumnSettings.vue'
 
 const store = useUserStore()
 const route = useRoute()
@@ -616,6 +715,43 @@ const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
+
+// 列配置器：全量列定义（现有列默认显示，新增可选列 defaultVisible:false 默认隐藏）
+// key 与 colVisible(key) 对应；操作列固定显示不进配置器
+const allColumns = [
+  { prop: 'order_no', label: '订单号' },
+  { prop: 'customer', label: '客户' },
+  { prop: 'size', label: '尺寸(高×宽)' },
+  { prop: 'wall_thick', label: '墙厚' },
+  { prop: 'cut_door', label: '门扇(高×宽)' },
+  { prop: 'cut_status', label: '下料状态' },
+  { prop: 'cut_date', label: '下料日' },
+  { prop: 'cut_remark_tags', label: '加工备注' },
+  { prop: 'sub_customer', label: '子客户', defaultVisible: false },
+  { prop: 'lock_hole', label: '锁孔', defaultVisible: false },
+  { prop: 'door_bom_name', label: '门型' },
+  { prop: 'color', label: '颜色' },
+  { prop: 'style', label: '款式', defaultVisible: false },
+  { prop: 'board', label: '门扇板材', defaultVisible: false },
+  { prop: 'total_amount', label: '应收' },
+  { prop: 'paid_amount', label: '已收' },
+  { prop: 'balance', label: '欠款' },
+  { prop: 'customer_type', label: '客户类别', defaultVisible: false },
+  { prop: 'pay_method', label: '付款方式', defaultVisible: false },
+  { prop: 'handler_sale', label: '经手人' },
+  { prop: 'salesperson', label: '业务员', defaultVisible: false },
+  { prop: 'installer', label: '安装师傅', defaultVisible: false },
+  { prop: 'order_date', label: '下单日' },
+  { prop: 'actual_ship_date', label: '发货日' },
+  { prop: 'ship_no', label: '发货单号', defaultVisible: false },
+  { prop: 'pay_date', label: '收款日' },
+  { prop: 'receipt_no', label: '收据号', defaultVisible: false },
+  { prop: 'remark', label: '订单备注', defaultVisible: false },
+  { prop: 'status', label: '状态' },
+  { prop: 'aging', label: '账龄' },
+]
+const visibleCols = ref(allColumns.filter((c) => c.defaultVisible !== false).map((c) => c.prop))
+function colVisible(key) { return visibleCols.value.includes(key) }
 
 // 表格固定滚动高度：搜索条件固定不滚，只有表格表体内部滚动
 // 按窗口高度动态算（留出搜索区/分页/卡片边距约 280px），最小 300 保证小屏可用
@@ -1182,8 +1318,101 @@ async function onBatchCut() {
   load()
 }
 
+// 批量领料：一个物料总量分给多笔订单，快捷输入 1+3+5+7（平均预填/复制同上/键盘流/自动分配余量）
+const materialList = ref([])
+const batchReqVisible = ref(false)
+const batchReqForm = ref({ material_id: '', total_qty: 0, req_date: todayLocal(), handler: store.name || '' })
+const batchReqItems = ref([]) // [{order_id,order_no,customer,door_bom_name,size,qty}]
+const qtyInputs = ref([]) // el-input refs，键盘流聚焦用
+
+// Σ已填数量（空/非法当0）
+const filledSum = computed(() => batchReqItems.value.reduce((s, it) => s + (Number(it.qty) || 0), 0))
+// 余量 = 总量 - 已填（正=剩, 负=超）
+const remainQty = computed(() => (Number(batchReqForm.value.total_qty) || 0) - filledSum.value)
+// 可提交：基础信息齐 + 至少1单有数量 + Σ=总量
+const canSubmitBatchReq = computed(() => {
+  const f = batchReqForm.value
+  if (!f.material_id || !f.total_qty || !f.req_date || !f.handler) return false
+  if (filledSum.value !== Number(f.total_qty)) return false
+  return batchReqItems.value.some((it) => Number(it.qty) > 0)
+})
+
+function openBatchReq() {
+  if (selectedRows.value.length < 2) return ElMessage.warning('批量领料至少勾选 2 单')
+  batchReqItems.value = selectedRows.value.map((r) => ({
+    order_id: r.id,
+    order_no: r.order_no,
+    customer: r.customer,
+    door_bom_name: r.door_bom_name,
+    size: `${r.door_h || '-'}×${r.door_w || '-'}`,
+    qty: '',
+  }))
+  batchReqForm.value = { material_id: '', total_qty: 0, req_date: todayLocal(), handler: store.name || '' }
+  qtyInputs.value = []
+  batchReqVisible.value = true
+}
+
+// ① 平均预填：总量÷N，余数依次+1给前几单
+function avgFill() {
+  const total = Number(batchReqForm.value.total_qty)
+  if (!total || total <= 0) return ElMessage.warning('先填总领料数量')
+  const n = batchReqItems.value.length
+  const base = Math.floor(total / n)
+  const rem = total - base * n
+  batchReqItems.value.forEach((it, i) => { it.qty = String(base + (i < rem ? 1 : 0)) })
+}
+
+// ③ 复制上一行
+function copyPrev(idx) {
+  if (idx === 0) return
+  batchReqItems.value[idx].qty = batchReqItems.value[idx - 1].qty
+  focusQty(idx)
+}
+
+// ⑦ 自动分配余量：把剩余总量平均分给 qty 为空的行
+function autoFillRemain() {
+  const total = Number(batchReqForm.value.total_qty)
+  if (!total) return ElMessage.warning('先填总领料数量')
+  const emptyIdxs = []
+  batchReqItems.value.forEach((it, i) => { if (!it.qty || Number(it.qty) <= 0) emptyIdxs.push(i) })
+  if (emptyIdxs.length === 0) return ElMessage.warning('无空行可分配')
+  const remain = total - filledSum.value
+  if (remain <= 0) return ElMessage.warning('已填数量已达/超总量，无余量可分')
+  const base = Math.floor(remain / emptyIdxs.length)
+  const rem = remain - base * emptyIdxs.length
+  emptyIdxs.forEach((oi, i) => { batchReqItems.value[oi].qty = String(base + (i < rem ? 1 : 0)) })
+}
+
+// ⑤ 键盘流：聚焦/Enter下一行/↑↓相邻行
+function focusQty(idx) { qtyInputs.value[idx]?.focus?.() }
+function onQtyEnter(idx) { if (idx < batchReqItems.value.length - 1) focusQty(idx + 1) }
+function onQtyKeydown(e, idx) {
+  if (e.key === 'ArrowDown') { e.preventDefault(); if (idx < batchReqItems.value.length - 1) focusQty(idx + 1) }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); if (idx > 0) focusQty(idx - 1) }
+}
+
+async function onBatchReq() {
+  const f = batchReqForm.value
+  const items = batchReqItems.value
+    .filter((it) => Number(it.qty) > 0)
+    .map((it) => ({ order_id: it.order_id, qty: Number(it.qty) }))
+  if (items.length === 0) return ElMessage.warning('至少分配一单数量')
+  const sum = items.reduce((s, it) => s + it.qty, 0)
+  if (sum !== Number(f.total_qty)) return ElMessage.warning(`分配合计 ${sum} 与总量 ${f.total_qty} 不符`)
+  const res = await requisitionApi.batch({
+    material_id: f.material_id,
+    req_date: f.req_date,
+    handler: f.handler,
+    items,
+  })
+  ElMessage.success(res.msg || '批量领料完成')
+  batchReqVisible.value = false
+  load()
+}
+
 onMounted(async () => {
   bomList.value = (await bomApi.all()).data
+  materialList.value = (await materialApi.all()).data || []
   cutConfig.value = (await cuttingApi.getConfig()).data
   cutTagOptions.value = (await cuttingApi.getTags()).data || []
   try { lockHoleOptions.value = (await orderApi.lockHoles()).data || [] } catch (e) {}
@@ -1216,6 +1445,14 @@ onUnmounted(() => {
 .batch-cut-group .group-orders { line-height: 1.6; }
 /* 标签类型选择按钮内换行 */
 .label-radio-group .el-radio-button__inner { line-height: 1.4; padding: 8px 14px; }
+/* 批量领料弹窗：操作条 + 汇总 */
+.batch-req-bar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
+.batch-req-actions { display: flex; align-items: center; gap: 8px; }
+.batch-req-hint { font-size: 12px; }
+.batch-req-sum { font-size: 13px; }
+.batch-req-sum .warn { color: #e6a23c; font-weight: 600; }
+.batch-req-sum .danger { color: #f56c6c; font-weight: 600; }
+.batch-req-sum .ok { color: #67c23a; font-weight: 600; }
 /* 整表字号加大一号（14→15px），提升可读性 */
 :deep(.el-table) { font-size: 15px; }
 /* 欠款>0 输入框标红提示 */

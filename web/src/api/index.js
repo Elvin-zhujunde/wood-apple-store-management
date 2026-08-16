@@ -52,6 +52,7 @@ export const inboundApi = {
 export const requisitionApi = {
   list: (params) => request.get('/requisition', { params }),
   create: (data) => request.post('/requisition', data),
+  batch: (data) => request.post('/requisition/batch', data),
 }
 
 // 库存

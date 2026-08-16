@@ -21,14 +21,16 @@ function wrap(fn) {
  * 生成单据号: prefix-YYYYMMDD-NNN
  * table: 表名, prefix: 前缀, dateField: 日期字段名
  */
-async function genDocNo(table, prefix, dateField) {
+async function genDocNo(table, prefix, dateField, conn) {
   const today = new Date();
   const ymd =
     today.getFullYear().toString() +
     String(today.getMonth() + 1).padStart(2, '0') +
     String(today.getDate()).padStart(2, '0');
   const like = `${prefix}-${ymd}-%`;
-  const [rows] = await pool.query(
+  // conn 可选：事务内批量生成连续单号时须传事务连接，否则全局pool看不到未提交的前序单号会算出重复序号
+  const q = conn || pool;
+  const [rows] = await q.query(
     `SELECT ${dateField}_no AS no FROM ${table} WHERE ${dateField}_no LIKE ? ORDER BY id DESC LIMIT 1`,
     [like]
   );
