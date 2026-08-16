@@ -10,7 +10,8 @@ export const menuList = [
   { path: '/inbound', title: '采购入库', icon: 'Goods', roles: ALL },
   { path: '/requisition', title: '生产领料', icon: 'Tools', roles: ALL },
   { path: '/materials', title: '物料档案', icon: 'Files', roles: ALL },
-  { path: '/door-bom', title: '门型BOM', icon: 'Setting', roles: ALL },
+  // 门型BOM 管理入口隐藏（物料消耗统计全走领料，BOM 不参与；功能保留，恢复时取消注释即可）
+  // { path: '/door-bom', title: '门型BOM', icon: 'Setting', roles: ALL },
 ]
 
 export function menusForRole(role) {
