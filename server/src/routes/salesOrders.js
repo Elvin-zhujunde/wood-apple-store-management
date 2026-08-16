@@ -103,6 +103,63 @@ router.put(
   })
 );
 
+// 批量编辑：勾选若干单，统一改台账字段（经手人/业务员/安装师傅/客户类别/付款方式等）+ 可改状态
+// 台账字段全改（所有选中单）；状态走状态机前向校验（只前向流转，已收款锁，回退跳过，不到已收款——已收款需金额配套走批量收款）
+// 空串视为清空（写 NULL）；未勾选的字段不传不改动
+router.put(
+  '/batch/update',
+  wrap(async (req, res) => {
+    const { ids, fields } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return fail(res, '请选择订单');
+    if (!fields || typeof fields !== 'object') return fail(res, '缺少更新字段');
+
+    // 台账字段白名单（不含金额/数量/门型等订单核心，不含状态——状态单独守卫）
+    const ALLOWED = [
+      'handler_sale', 'salesperson', 'installer', 'customer_type',
+      'handler_ship', 'handler_finance', 'pay_method', 'remark',
+      'address', 'hardware', 'biz_fee', 'edge_band', 'frame_line',
+    ];
+    const sets = [];
+    const vals = [];
+    for (const k of ALLOWED) {
+      if (fields[k] !== undefined) {
+        sets.push(`${k}=?`);
+        vals.push(fields[k] === '' ? null : fields[k]);
+      }
+    }
+
+    // 状态前向校验（FIELD 函数比状态序号：新建<已发货<赊账中<已收款，只更新 current<target 的单）
+    let statusResult = null;
+    if (fields.status !== undefined) {
+      const TARGET = ['新建', '已发货', '赊账中'];
+      if (fields.status === '已收款') return fail(res, '批量改"已收款"请用「批量收款」按钮（需金额配套）');
+      if (!TARGET.includes(fields.status)) return fail(res, '非法状态：' + fields.status);
+      const [sr] = await pool.query(
+        `UPDATE sales_orders SET status=?
+          WHERE id IN (?)
+            AND FIELD(status,'新建','已发货','赊账中','已收款') < FIELD(?,'新建','已发货','赊账中','已收款')`,
+        [fields.status, ids, fields.status]
+      );
+      const skipped = ids.length - sr.affectedRows;
+      statusResult = { success: sr.affectedRows, skipped };
+    }
+
+    // 台账字段：所有选中单全改（不受状态限制）
+    let fieldResult = null;
+    if (sets.length > 0) {
+      const [fr] = await pool.query(`UPDATE sales_orders SET ${sets.join(', ')} WHERE id IN (?)`, [...vals, ids]);
+      fieldResult = { success: fr.affectedRows };
+    }
+
+    if (!fieldResult && !statusResult) return fail(res, '未勾选任何字段');
+
+    const msgs = [];
+    if (fieldResult) msgs.push(`${fieldResult.success} 单台账字段已更新`);
+    if (statusResult) msgs.push(`状态：${statusResult.success} 单前向流转${statusResult.skipped ? `，${statusResult.skipped} 单已为目标或更靠后，跳过` : ''}`);
+    ok(res, { fieldResult, statusResult }, `批量编辑完成：${msgs.join('；')}`);
+  })
+);
+
 // 详情
 router.get(
   '/:id',

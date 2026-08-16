@@ -35,6 +35,7 @@ export const orderApi = {
   reopen: (id) => request.put('/sales-orders/' + id + '/reopen'),
   batchShip: (data) => request.put('/sales-orders/batch/ship', data),
   batchPay: (data) => request.put('/sales-orders/batch/pay', data),
+  batchUpdate: (data) => request.put('/sales-orders/batch/update', data),
 }
 
 // 采购入库

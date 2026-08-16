@@ -19,8 +19,9 @@
       <el-button type="success" @click="openAdd">+ 接单</el-button>
       <el-button type="warning" :disabled="batchShipableCount === 0" @click="openBatchShip">批量发货 ({{ batchShipableCount }})</el-button>
       <el-button type="warning" :disabled="batchPayableCount === 0" @click="openBatchPay">批量收款 ({{ batchPayableCount }})</el-button>
+      <el-button type="primary" :disabled="selectedRows.length === 0" @click="openBatchEdit">批量编辑 ({{ selectedRows.length }})</el-button>
     </div>
-    <el-table :data="list" stripe border @selection-change="onSelectionChange">
+    <el-table ref="tableRef" :data="list" stripe border @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
       <el-table-column type="selection" width="42" />
       <el-table-column prop="order_no" label="订单号" width="160" />
       <el-table-column prop="customer" label="客户" min-width="120" />
@@ -189,6 +190,65 @@
       </template>
     </el-dialog>
 
+    <!-- 批量编辑弹窗（勾选式：勾哪项改哪项，未勾保持原值） -->
+    <el-dialog v-model="batchEditVisible" title="批量编辑" width="560px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        已选 <strong>{{ selectedRows.length }}</strong> 单。勾选要改的项并填新值，未勾选的保持原值。
+        <div class="muted" style="margin-top:4px">提示：先按客户/状态等条件筛选，再用表头全选或 shift+点击区间选择，可快速圈选一批单。</div>
+      </el-alert>
+      <el-form :model="batchEditForm" label-width="110px">
+        <el-form-item label="改状态">
+          <el-checkbox v-model="batchEditForm.enableStatus" style="margin-right:12px" />
+          <el-select v-model="batchEditForm.status" :disabled="!batchEditForm.enableStatus" style="width:160px" placeholder="选择状态">
+            <el-option label="新建" value="新建" />
+            <el-option label="已发货" value="已发货" />
+            <el-option label="赊账中" value="赊账中" />
+          </el-select>
+          <div class="muted">仅前向流转（新建→已发货→赊账中）；已收款锁，回退跳过；改"已收款"请用批量收款</div>
+        </el-form-item>
+        <el-form-item label="改经手人(销售)">
+          <el-checkbox v-model="batchEditForm.enableHandlerSale" style="margin-right:12px" />
+          <el-input v-model="batchEditForm.handler_sale" :disabled="!batchEditForm.enableHandlerSale" placeholder="销售经手人" style="width:220px" />
+        </el-form-item>
+        <el-form-item label="改业务员">
+          <el-checkbox v-model="batchEditForm.enableSalesperson" style="margin-right:12px" />
+          <el-input v-model="batchEditForm.salesperson" :disabled="!batchEditForm.enableSalesperson" placeholder="业务员" style="width:220px" />
+        </el-form-item>
+        <el-form-item label="改安装师傅">
+          <el-checkbox v-model="batchEditForm.enableInstaller" style="margin-right:12px" />
+          <el-input v-model="batchEditForm.installer" :disabled="!batchEditForm.enableInstaller" placeholder="安装师傅" style="width:220px" />
+        </el-form-item>
+        <el-form-item label="改客户类别">
+          <el-checkbox v-model="batchEditForm.enableCustomerType" style="margin-right:12px" />
+          <el-select v-model="batchEditForm.customer_type" :disabled="!batchEditForm.enableCustomerType" clearable style="width:220px">
+            <el-option label="经销商" value="经销商" /><el-option label="直销" value="直销" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="改付款方式">
+          <el-checkbox v-model="batchEditForm.enablePayMethod" style="margin-right:12px" />
+          <el-select v-model="batchEditForm.pay_method" :disabled="!batchEditForm.enablePayMethod" clearable style="width:220px">
+            <el-option label="扫码" value="扫码" /><el-option label="现金" value="现金" /><el-option label="转账" value="转账" /><el-option label="赊账" value="赊账" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="改发货经手人">
+          <el-checkbox v-model="batchEditForm.enableHandlerShip" style="margin-right:12px" />
+          <el-input v-model="batchEditForm.handler_ship" :disabled="!batchEditForm.enableHandlerShip" placeholder="发货经手人" style="width:220px" />
+        </el-form-item>
+        <el-form-item label="改收款经手人">
+          <el-checkbox v-model="batchEditForm.enableHandlerFinance" style="margin-right:12px" />
+          <el-input v-model="batchEditForm.handler_finance" :disabled="!batchEditForm.enableHandlerFinance" placeholder="收款经手人" style="width:220px" />
+        </el-form-item>
+        <el-form-item label="改备注">
+          <el-checkbox v-model="batchEditForm.enableRemark" style="margin-right:12px" />
+          <el-input v-model="batchEditForm.remark" :disabled="!batchEditForm.enableRemark" type="textarea" :rows="2" placeholder="覆盖所选订单备注（留空=清空）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchEditVisible = false">取消</el-button>
+        <el-button type="primary" @click="onBatchUpdate">确认批量编辑</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 生成下料单弹窗（门扇高宽给默认值=门洞−扣尺，可改） -->
     <el-dialog v-model="cuttingVisible" title="生成下料单" width="620px" :close-on-click-modal="false">
       <el-alert type="info" :closable="false" style="margin-bottom:16px">
@@ -227,7 +287,7 @@
     </el-dialog>
 
     <!-- 新增/编辑对话框（保留原完整表单） -->
-    <el-dialog v-model="dlgVisible" :title="dlgTitle" width="760px" :close-on-click-modal="false">
+    <el-dialog v-model="dlgVisible" :title="dlgTitle" width="960px" :close-on-click-modal="false">
       <el-tabs v-model="activeTab">
         <el-tab-pane label="订单信息" name="info">
           <el-form :model="form" label-width="110px" size="default">
@@ -412,10 +472,16 @@ const payForm = ref({})
 
 // 批量操作
 const selectedRows = ref([])
+const tableRef = ref(null)
 const batchShipVisible = ref(false)
 const batchShipForm = ref({})
 const batchPayVisible = ref(false)
 const batchPayForm = ref({})
+// 批量编辑（勾选式：勾哪项改哪项）
+const batchEditVisible = ref(false)
+const batchEditForm = ref({})
+// shift 区间选择：记录上次点击行，shift+点击选中区间
+let lastClickedRow = null
 
 // 下料单生成
 const cuttingVisible = ref(false)
@@ -508,6 +574,64 @@ const batchPayableCount = computed(() => selectedRows.value.filter((r) => r.stat
 
 function onSelectionChange(rows) {
   selectedRows.value = rows
+}
+
+// shift 区间选择：点击行时若按住 shift，选中上次点击行到当前行之间的所有行
+// 单击 checkbox 由 el-table 原生处理（@select 触发，这里只更新 lastClickedRow 锚点）
+function onRowClick(row, _column, event) {
+  if (event.shiftKey && lastClickedRow && lastClickedRow !== row) {
+    const listVal = list.value
+    const startIdx = listVal.indexOf(lastClickedRow)
+    const endIdx = listVal.indexOf(row)
+    if (startIdx !== -1 && endIdx !== -1) {
+      const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+      for (let i = from; i <= to; i++) {
+        tableRef.value && tableRef.value.toggleRowSelection(listVal[i], true)
+      }
+    }
+  }
+  lastClickedRow = row
+}
+// checkbox 单击时更新锚点（让 shift 区间以最近勾选行为起点）
+function onSelect(selection, row) {
+  lastClickedRow = row
+}
+
+// 批量编辑：勾选式表单，勾哪项改哪项，未勾不传
+function openBatchEdit() {
+  batchEditForm.value = {
+    enableStatus: false, status: '',
+    enableHandlerSale: false, handler_sale: '',
+    enableSalesperson: false, salesperson: '',
+    enableInstaller: false, installer: '',
+    enableCustomerType: false, customer_type: '',
+    enablePayMethod: false, pay_method: '',
+    enableHandlerShip: false, handler_ship: '',
+    enableHandlerFinance: false, handler_finance: '',
+    enableRemark: false, remark: '',
+  }
+  batchEditVisible.value = true
+}
+
+async function onBatchUpdate() {
+  const f = batchEditForm.value
+  const fields = {}
+  if (f.enableStatus) fields.status = f.status
+  if (f.enableHandlerSale) fields.handler_sale = f.handler_sale
+  if (f.enableSalesperson) fields.salesperson = f.salesperson
+  if (f.enableInstaller) fields.installer = f.installer
+  if (f.enableCustomerType) fields.customer_type = f.customer_type
+  if (f.enablePayMethod) fields.pay_method = f.pay_method
+  if (f.enableHandlerShip) fields.handler_ship = f.handler_ship
+  if (f.enableHandlerFinance) fields.handler_finance = f.handler_finance
+  if (f.enableRemark) fields.remark = f.remark
+  if (Object.keys(fields).length === 0) return ElMessage.warning('请至少勾选一项要修改的字段')
+  if (f.enableStatus && !f.status) return ElMessage.warning('勾选了改状态但未选目标状态')
+  const ids = selectedRows.value.map((r) => r.id)
+  const res = await orderApi.batchUpdate({ ids, fields })
+  ElMessage.success(res.msg || '批量编辑完成')
+  batchEditVisible.value = false
+  load()
 }
 
 function openBatchShip() {
