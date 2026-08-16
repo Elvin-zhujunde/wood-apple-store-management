@@ -438,7 +438,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
@@ -576,10 +576,16 @@ function onSelectionChange(rows) {
   selectedRows.value = rows
 }
 
-// shift 区间选择：点击行时若按住 shift，选中上次点击行到当前行之间的所有行
-// 单击 checkbox 由 el-table 原生处理（@select 触发，这里只更新 lastClickedRow 锚点）
-function onRowClick(row, _column, event) {
-  if (event.shiftKey && lastClickedRow && lastClickedRow !== row) {
+// shift 区间选择：用户实际点的是行首 checkbox（走 @select，无 event 对象拿不到 shiftKey），
+// 故用全局 shiftKey 标志：window keydown/keyup 记录 shift 按下状态，@select 时读标志做区间选择
+let shiftDown = false
+function onShiftDown(e) { if (e.key === 'Shift') shiftDown = true }
+function onShiftUp(e) { if (e.key === 'Shift') shiftDown = false }
+
+// @select(selection, row)：checkbox 单击时触发。row=被点击的行。
+// 若按住 shift 且有锚点行，选中锚点到当前行之间所有行；否则仅更新锚点
+function onSelect(selection, row) {
+  if (shiftDown && lastClickedRow && lastClickedRow !== row) {
     const listVal = list.value
     const startIdx = listVal.indexOf(lastClickedRow)
     const endIdx = listVal.indexOf(row)
@@ -592,8 +598,8 @@ function onRowClick(row, _column, event) {
   }
   lastClickedRow = row
 }
-// checkbox 单击时更新锚点（让 shift 区间以最近勾选行为起点）
-function onSelect(selection, row) {
+// 点行体（非 checkbox）也更新锚点，方便后续 shift+checkbox 选区间
+function onRowClick(row) {
   lastClickedRow = row
 }
 
@@ -858,6 +864,13 @@ onMounted(async () => {
     query.value.status = String(route.query.status)
   }
   load()
+  window.addEventListener('keydown', onShiftDown)
+  window.addEventListener('keyup', onShiftUp)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onShiftDown)
+  window.removeEventListener('keyup', onShiftUp)
 })
 </script>
 
