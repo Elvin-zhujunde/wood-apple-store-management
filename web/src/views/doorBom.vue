@@ -28,6 +28,9 @@
           <el-col :span="12"><el-form-item label="可选颜色" required><el-input v-model="form.colors" placeholder="逗号分隔：肤感白,黑胡桃" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="非标加价%"><el-input-number v-model="form.nonstd_markup" :min="0" :precision="2" style="width:100%" /></el-form-item></el-col>
         </el-row>
+        <!-- 门型关联的物料损耗明细已隐藏：物料消耗统计全走领料，门型不再关联物料明细。
+             door_bom_items 表与后端 items 透传逻辑保留，恢复时取消下方注释即可。 -->
+        <!--
         <el-divider content-position="left">BOM 物料明细</el-divider>
         <div style="margin-bottom:8px"><el-button type="primary" size="small" @click="addItem">+ 添加物料</el-button></div>
         <el-table :data="form.items" border size="small">
@@ -48,6 +51,7 @@
             <template #default="{ $index }"><el-button link type="danger" @click="form.items.splice($index,1)">删除</el-button></template>
           </el-table-column>
         </el-table>
+        -->
         <el-form-item v-if="isEdit" label="门型样图" style="margin-top:12px">
           <ImageUpload v-model="imgList" entity-type="bom" :entity-id="form.id" />
         </el-form-item>
@@ -62,13 +66,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { bomApi, materialApi, attachmentApi } from '../api'
+import { bomApi, attachmentApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ImageUpload from '../components/ImageUpload.vue'
 
 const keyword = ref('')
 const list = ref([])
-const mats = ref([])
 const dlgVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({})
@@ -109,8 +112,7 @@ function addItem() {
 async function onSave() {
   const f = form.value
   if (!f.code || !f.name || !f.standard_size || !f.colors) return ElMessage.warning('请补全门型基础信息')
-  if (!f.items.length) return ElMessage.warning('请至少添加一项物料明细')
-  if (f.items.some((it) => !it.material_id)) return ElMessage.warning('明细中存在未选物料')
+  // 物料明细校验已随明细区隐藏移除（门型不关联物料损耗，items 传空数组）
   if (isEdit.value) await bomApi.update(f.id, f)
   else await bomApi.create(f)
   ElMessage.success('保存成功')
@@ -125,8 +127,7 @@ async function onDel(row) {
   load()
 }
 
-onMounted(async () => {
-  mats.value = (await materialApi.all()).data
+onMounted(() => {
   load()
 })
 </script>

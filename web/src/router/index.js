@@ -28,13 +28,10 @@ const routes = [
 const router = createRouter({ history: createWebHistory(), routes })
 
 // 路由守卫：登录校验 + 角色菜单校验
-// 隐藏路由：功能保留但前端入口收起，直接访问 URL 跳回工作台（恢复时从 menu.js 取消注释即可）
-const HIDDEN_ROUTES = ['/door-bom']
 router.beforeEach((to, from, next) => {
   const store = useUserStore()
   if (to.path === '/login') return next()
   if (!store.isLogin) return next('/login')
-  if (HIDDEN_ROUTES.includes(to.path)) return next('/dashboard')
   // 校验该路由是否在当前角色菜单中
   const fullPath = to.path.startsWith('/') ? to.path : '/' + to.path
   const menu = menuList.find((m) => m.path === fullPath)
