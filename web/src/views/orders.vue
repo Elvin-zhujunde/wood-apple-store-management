@@ -476,6 +476,15 @@
           <el-input v-model="batchReqForm.handler" style="width:120px" />
         </el-form-item>
       </el-form>
+      <div v-if="selectedMaterial" class="batch-req-stock">
+        <span class="stock-cur">当前库存：<b>{{ selectedMaterial.stock_qty }}</b> {{ selectedMaterial.unit }}</span>
+        <span class="stock-sep">|</span>
+        <span class="stock-after">
+          领料后剩：<b :class="afterReqStock < 0 ? 'danger' : 'ok'">{{ afterReqStock }}</b> {{ selectedMaterial.unit }}
+          <span v-if="afterReqStock < 0" class="danger">（不够，差 {{ -afterReqStock }}）</span>
+          <span v-else-if="afterReqStock === 0" class="warn">（刚好用完）</span>
+        </span>
+      </div>
       <div class="batch-req-bar">
         <div class="batch-req-actions">
           <el-button size="small" type="primary" plain @click="avgFill">① 平均预填</el-button>
@@ -1329,6 +1338,13 @@ const qtyInputs = ref([]) // el-input refs，键盘流聚焦用
 const filledSum = computed(() => batchReqItems.value.reduce((s, it) => s + (Number(it.qty) || 0), 0))
 // 余量 = 总量 - 已填（正=剩, 负=超）
 const remainQty = computed(() => (Number(batchReqForm.value.total_qty) || 0) - filledSum.value)
+// 当前选中物料（库存参考用）
+const selectedMaterial = computed(() => materialList.value.find((m) => m.id === batchReqForm.value.material_id) || null)
+// 领料后剩余库存 = 当前库存 - 总领料量（负=不够）
+const afterReqStock = computed(() => {
+  if (!selectedMaterial.value) return null
+  return Number(selectedMaterial.value.stock_qty) - (Number(batchReqForm.value.total_qty) || 0)
+})
 // 可提交：基础信息齐 + 至少1单有数量 + Σ=总量
 const canSubmitBatchReq = computed(() => {
   const f = batchReqForm.value
@@ -1445,6 +1461,12 @@ onUnmounted(() => {
 .batch-cut-group .group-orders { line-height: 1.6; }
 /* 标签类型选择按钮内换行 */
 .label-radio-group .el-radio-button__inner { line-height: 1.4; padding: 8px 14px; }
+/* 批量领料弹窗：库存参考行 */
+.batch-req-stock { background:#f5f7fa; border:1px solid #e4e7ed; border-radius:4px; padding:8px 12px; margin:8px 0; font-size:13px; display:flex; align-items:center; gap:8px; }
+.batch-req-stock .stock-cur b { color:#409eff; }
+.batch-req-stock .stock-sep { color:#dcdfe6; }
+.batch-req-stock .stock-after b.ok { color:#67c23a; }
+.batch-req-stock .stock-after b.danger { color:#f56c6c; }
 /* 批量领料弹窗：操作条 + 汇总 */
 .batch-req-bar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
 .batch-req-actions { display: flex; align-items: center; gap: 8px; }
