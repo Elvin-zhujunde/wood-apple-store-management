@@ -10,6 +10,7 @@ export const menuList = [
   { path: '/inbound', title: '采购入库', icon: 'Goods', roles: ALL },
   { path: '/requisition', title: '生产领料', icon: 'Tools', roles: ALL },
   { path: '/materials', title: '物料档案', icon: 'Files', roles: ALL },
+  { path: '/door-bom', title: '门型BOM', icon: 'Setting', roles: ALL },
 ]
 
 export function menusForRole(role) {

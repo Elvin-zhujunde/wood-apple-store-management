@@ -16,9 +16,14 @@ export const materialApi = {
   remove: (id) => request.delete('/materials/' + id),
 }
 
-// 门型BOM（ARE-109：管理模块下线，仅保留只读下拉数据源供销售订单门型选择）
+// 门型BOM（管理模块已还原：列表/详情/增删改 + 只读下拉源）
 export const bomApi = {
+  list: (params) => request.get('/door-bom', { params }),
   all: () => request.get('/door-bom/all'),
+  detail: (id) => request.get('/door-bom/' + id),
+  create: (data) => request.post('/door-bom', data),
+  update: (id, data) => request.put('/door-bom/' + id, data),
+  remove: (id) => request.delete('/door-bom/' + id),
 }
 
 // 销售订单
