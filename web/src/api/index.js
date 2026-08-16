@@ -89,7 +89,7 @@ export const dashboardApi = {
 // 业务图片附件
 export const attachmentApi = {
   list: (entity_type, entity_id) => request.get('/attachments', { params: { entity_type, entity_id } }),
-  upload: (formData) => request.post('/attachments/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  upload: (formData, config) => request.post('/attachments/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }, ...config }),
   remove: (id) => request.delete('/attachments/' + id),
 }
 
