@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   username      VARCHAR(50)  NOT NULL UNIQUE COMMENT '登录账号',
   password_hash VARCHAR(255) NOT NULL COMMENT 'bcrypt 哈希',
-  role          ENUM('sale','stock','finance') NOT NULL COMMENT '销售/库管/财务',
+  role          ENUM('boss','worker') NOT NULL COMMENT '老板(超管)/工人(仅量尺)',
   name          VARCHAR(50)  NOT NULL COMMENT '姓名',
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
@@ -198,3 +198,48 @@ CREATE TABLE IF NOT EXISTS attachments (
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_entity (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务图片附件';
+
+-- ============================================================
+-- 11. 客户档案表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS customers (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(100) NOT NULL COMMENT '客户名称(经销商名)',
+  customer_type VARCHAR(50)  NULL COMMENT '客户类别(经销商/直销)',
+  phone         VARCHAR(30)  NULL COMMENT '联系电话',
+  address       VARCHAR(200) NULL COMMENT '地址',
+  remark        VARCHAR(500) NULL COMMENT '备注',
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户档案';
+
+-- ============================================================
+-- 12. 客户安装定位(子客户)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS customer_locations (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT NOT NULL COMMENT '所属客户',
+  name        VARCHAR(100) NOT NULL COMMENT '安装定位(如 碧桂园3栋1单元501)',
+  remark      VARCHAR(200) NULL,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_loc_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户安装定位(子客户)';
+
+-- ============================================================
+-- 13. 现场测量记录
+-- ============================================================
+CREATE TABLE IF NOT EXISTS measure_records (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id     INT NOT NULL COMMENT '所属客户',
+  location_id     INT NOT NULL COMMENT '安装定位(现场必选/新建)',
+  door_h          DECIMAL(8,2) NOT NULL COMMENT '门洞高(mm) 必填',
+  door_w          DECIMAL(8,2) NOT NULL COMMENT '门洞宽(mm) 必填',
+  wall_thick      DECIMAL(8,2) NOT NULL COMMENT '墙厚(mm) 必填',
+  remark          VARCHAR(500) NULL COMMENT '现场备注',
+  measured_by     VARCHAR(50) NOT NULL COMMENT '测量人(取JWT.name)',
+  measured_at     DATETIME NOT NULL COMMENT '测量时间',
+  status          VARCHAR(20) NOT NULL DEFAULT '待转单' COMMENT '待转单/已转单',
+  sales_order_id  INT NULL COMMENT '转单后关联的SO id',
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_meas_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
+  CONSTRAINT fk_meas_location FOREIGN KEY (location_id) REFERENCES customer_locations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='现场测量记录';
