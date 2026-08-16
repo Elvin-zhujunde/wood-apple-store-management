@@ -51,8 +51,12 @@ router.get(
     )[0][0].c;
     const rows = (
       await pool.query(
-        `SELECT so.*, b.name AS door_bom_name, b.standard_size
-           FROM sales_orders so LEFT JOIN door_bom b ON b.id = so.door_bom_id
+        `SELECT so.*, b.name AS door_bom_name, b.standard_size,
+                cl.id AS cutting_id, cl.door_height AS cut_door_height, cl.door_width AS cut_door_width,
+                cl.mode AS cut_mode, cl.status AS cut_status, cl.cut_date
+           FROM sales_orders so
+           LEFT JOIN door_bom b ON b.id = so.door_bom_id
+           LEFT JOIN cutting_list cl ON cl.order_id = so.id
           ${clause} ORDER BY so.id DESC LIMIT ? OFFSET ?`,
         [...params, Number(pageSize), (Number(page) - 1) * Number(pageSize)]
       )

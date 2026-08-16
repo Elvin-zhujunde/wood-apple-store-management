@@ -31,6 +31,22 @@
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
+      <el-table-column prop="wall_thick" label="墙厚" width="70" align="center">
+        <template #default="{ row }">{{ row.wall_thick != null ? row.wall_thick : '-' }}</template>
+      </el-table-column>
+      <el-table-column label="门扇(高×宽)" width="120">
+        <template #default="{ row }">
+          <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ row.cut_door_height }}×{{ row.cut_door_width }}</span>
+          <span v-else class="muted">未下料</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="下料状态" width="90">
+        <template #default="{ row }">
+          <el-tag v-if="row.cut_status" :type="cutStatusType(row.cut_status)" size="small">{{ row.cut_status }}</el-tag>
+          <span v-else class="muted">未下料</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="cut_date" label="下料日" width="110" :formatter="dateFmt" />
       <el-table-column prop="door_bom_name" label="门型" width="120" />
       <el-table-column prop="color" label="颜色" width="80" />
       <el-table-column label="应收" width="90" align="right" prop="total_amount" />
@@ -579,6 +595,10 @@ function agingStyle(days) {
 
 function statusType(s) {
   return { 新建: 'info', 已发货: 'warning', 赊账中: 'danger', 已收款: 'success' }[s] || 'info'
+}
+// 下料单状态配色（待下料=warning橙, 已下料=success绿）
+function cutStatusType(s) {
+  return { 待下料: 'warning', 已下料: 'success' }[s] || 'info'
 }
 
 // 批量：选中行中可发货/可收款的数量（后端也会做幂等校验，此处用于按钮可用性与提示）
