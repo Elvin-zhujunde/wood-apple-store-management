@@ -28,6 +28,7 @@
       <el-button type="success" :disabled="selectedRows.length === 0" @click="openBatchLabel">标签打印 ({{ selectedRows.length }})</el-button>
       <el-button type="primary" :disabled="batchCuttableCount === 0" @click="openBatchCut">批量下料 ({{ batchCuttableCount }})</el-button>
       <el-button type="info" :disabled="selectedRows.length < 2" @click="openBatchReq">批量领料 ({{ selectedRows.length }})</el-button>
+      <el-button type="warning" @click="openConvert">测量转单</el-button>
       <ColumnSettings :columns="allColumns" storage-key="orders-cols" @change="(v) => (visibleCols = v)" />
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
@@ -702,13 +703,53 @@
         <el-button type="primary" @click="onSubmit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 测量转单弹窗（H5工地录单闭环：boss 把工人 H5 现场测量记录转成正式 SO）-->
+    <el-dialog v-model="convDlg" title="测量转单" width="720px">
+      <!-- 列表态 -->
+      <div v-if="!convRow">
+        <el-input v-model="convKw" placeholder="搜客户/定位" style="width:240px;margin-bottom:8px" @keyup.enter="loadPending" clearable @clear="loadPending" />
+        <el-table :data="pending" border max-height="400">
+          <el-table-column prop="customer_name" label="客户" />
+          <el-table-column prop="location_name" label="定位" />
+          <el-table-column label="尺寸" width="160"><template #default="{row}">{{ `${row.door_h}×${row.door_w} 墙厚${row.wall_thick}` }}</template></el-table-column>
+          <el-table-column prop="photo_count" label="照片" width="60" />
+          <el-table-column prop="measured_at" label="测量时间" width="160" />
+          <el-table-column label="操作" width="100"><template #default="{row}"><el-button size="small" type="primary" @click="pickConvert(row)">转单</el-button></template></el-table-column>
+        </el-table>
+      </div>
+      <!-- 转单态 -->
+      <div v-else>
+        <el-descriptions :column="2" border size="small" style="margin-bottom:12px">
+          <el-descriptions-item label="客户">{{ convRow.customer_name }}</el-descriptions-item>
+          <el-descriptions-item label="定位">{{ convRow.location_name }}</el-descriptions-item>
+          <el-descriptions-item label="门洞高">{{ convRow.door_h }}</el-descriptions-item>
+          <el-descriptions-item label="门洞宽">{{ convRow.door_w }}</el-descriptions-item>
+          <el-descriptions-item label="墙厚">{{ convRow.wall_thick }}</el-descriptions-item>
+          <el-descriptions-item label="现场备注">{{ convRow.remark || '-' }}</el-descriptions-item>
+        </el-descriptions>
+        <el-form :model="convForm" label-width="80px">
+          <el-form-item label="门型"><el-select v-model="convForm.door_bom_id" filterable @change="onConvBomChange"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select></el-form-item>
+          <el-form-item label="颜色"><el-input v-model="convForm.color" /></el-form-item>
+          <el-form-item label="数量"><el-input-number v-model="convForm.qty" :min="1" /></el-form-item>
+          <el-form-item label="单价"><el-input-number v-model="convForm.unit_price" :min="0" :precision="2" /></el-form-item>
+          <el-form-item label="经手人"><el-input v-model="convForm.handler_sale" /></el-form-item>
+          <el-form-item label="下单日期"><el-date-picker v-model="convForm.order_date" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+          <el-form-item label="锁孔"><el-input v-model="convForm.lock_hole" /></el-form-item>
+        </el-form>
+        <div style="text-align:right">
+          <el-button @click="convRow=null">返回列表</el-button>
+          <el-button type="primary" :loading="converting" @click="doConvert">确认转单</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi } from '../api'
+import { orderApi, bomApi, measureApi, attachmentApi, cuttingApi, requisitionApi, materialApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1424,6 +1465,38 @@ async function onBatchReq() {
   ElMessage.success(res.msg || '批量领料完成')
   batchReqVisible.value = false
   load()
+}
+
+// ===== 测量转单（H5工地录单闭环：boss 桌面把工人 H5 现场测量记录转成正式 SO）=====
+const convDlg = ref(false)
+const convRow = ref(null)
+const pending = ref([])
+const convKw = ref('')
+const convForm = reactive({ door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0, 10), lock_hole: '' })
+const converting = ref(false)
+const openConvert = async () => {
+  convDlg.value = true
+  convRow.value = null
+  await loadPending()
+  if (!bomList.value.length) { const { data } = await bomApi.all(); bomList.value = data }
+}
+const loadPending = async () => { const { data } = await measureApi.pending({ keyword: convKw.value }); pending.value = data }
+const pickConvert = (row) => {
+  convRow.value = row
+  Object.assign(convForm, { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0, 10), lock_hole: '' })
+}
+const onConvBomChange = (id) => { const b = bomList.value.find((x) => x.id === id); if (b) convForm.color = b.colors?.split(',')[0] || '' }
+const doConvert = async () => {
+  if (!convForm.door_bom_id || !convForm.color || !convForm.unit_price) return ElMessage.warning('门型/颜色/单价必填')
+  converting.value = true
+  try {
+    const { data } = await measureApi.convert(convRow.value.id, convForm)
+    ElMessage.success(`转单成功 ${data.order_no}`)
+    convDlg.value = false
+    convRow.value = null
+    load()
+  } catch (e) { ElMessage.error(e.message || '转单失败') }
+  finally { converting.value = false }
 }
 
 onMounted(async () => {
