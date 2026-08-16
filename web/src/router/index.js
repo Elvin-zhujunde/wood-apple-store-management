@@ -8,6 +8,13 @@ const routes = [
   { path: '/cutting-list/print', name: 'cutting-list-print', component: () => import('../views/cuttingListPrint.vue'), meta: { title: '下料单打印' } },
   // 标签打印专用页：4 种标签类型，window.print 实现，@page 按标签纸尺寸定纸张
   { path: '/label/print', name: 'label-print', component: () => import('../views/labelPrint.vue'), meta: { title: '标签打印' } },
+  // H5 移动端路由组（脱 layout，Vant）
+  { path: '/m/login', name: 'm-login', component: () => import('../mobile/login.vue') },
+  { path: '/m', name: 'm-home', component: () => import('../mobile/layout.vue'), children: [
+    { path: '', name: 'm-list', component: () => import('../mobile/measureList.vue') },
+    { path: 'measure', name: 'm-new', component: () => import('../mobile/measureForm.vue') },
+    { path: 'measure/:id', name: 'm-detail', component: () => import('../mobile/measureDetail.vue') },
+  ]},
   {
     path: '/',
     component: () => import('../layout/index.vue'),
@@ -28,12 +35,19 @@ const routes = [
 
 const router = createRouter({ history: createWebHistory(), routes })
 
-// 路由守卫：登录校验 + 角色菜单校验
+// 路由守卫：登录校验 + worker 桌面拒入 + 角色菜单校验
 router.beforeEach((to, from, next) => {
   const store = useUserStore()
+  // H5 路由组放行
+  if (to.path.startsWith('/m')) {
+    if (to.path !== '/m/login' && !store.isLogin) return next('/m/login')
+    return next()
+  }
   if (to.path === '/login') return next()
   if (!store.isLogin) return next('/login')
-  // 校验该路由是否在当前角色菜单中
+  // worker 桌面拒入 → 跳 H5
+  if (store.role === 'worker') return next('/m')
+  // 原角色菜单校验
   const fullPath = to.path.startsWith('/') ? to.path : '/' + to.path
   const menu = menuList.find((m) => m.path === fullPath)
   if (menu && !menu.roles.includes(store.role)) {

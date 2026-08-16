@@ -1,6 +1,5 @@
-// 菜单配置：去角色化 —— 实际使用为 2-3 个自己人、角色不分，所有菜单对全部角色开放
-// roles 字段保留用于前端兼容，但三个角色均全可见
-const ALL = ['sale', 'stock', 'finance']
+// 角色模型：boss（超管，桌面全功能）+ worker（仅 H5 量尺，桌面拒入）
+const ALL = ['boss']
 export const menuList = [
   { path: '/dashboard', title: '工作台', icon: 'HomeFilled', roles: ALL },
   { path: '/inventory', title: '库存查询', icon: 'Box', roles: ALL },
@@ -10,11 +9,12 @@ export const menuList = [
   { path: '/requisition', title: '生产领料', icon: 'Tools', roles: ALL },
   { path: '/materials', title: '物料档案', icon: 'Files', roles: ALL },
   { path: '/door-bom', title: '门型BOM', icon: 'Setting', roles: ALL },
+  { path: '/customers', title: '客户档案', icon: 'OfficeBuilding', roles: ALL },
+  { path: '/users', title: '用户管理', icon: 'User', roles: ALL },
 ]
 
 export function menusForRole(role) {
   return menuList.filter((m) => m.roles.includes(role))
 }
 
-// 角色中文名
-export const roleLabel = { sale: '销售', stock: '库管/采购', finance: '财务/老板' }
+export const roleLabel = { boss: '老板', worker: '工人' }

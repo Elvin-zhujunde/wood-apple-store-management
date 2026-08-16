@@ -92,3 +92,35 @@ export const attachmentApi = {
   upload: (formData) => request.post('/attachments/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   remove: (id) => request.delete('/attachments/' + id),
 }
+
+// 客户档案
+export const customerApi = {
+  list: (params) => request.get('/customers', { params }),
+  all: () => request.get('/customers/all'),
+  create: (data) => request.post('/customers', data),
+  update: (id, data) => request.put('/customers/' + id, data),
+  remove: (id) => request.delete('/customers/' + id),
+  locations: (cid) => request.get('/customers/' + cid + '/locations'),
+  addLocation: (cid, data) => request.post('/customers/' + cid + '/locations', data),
+  removeLocation: (lid) => request.delete('/customers/locations/' + lid),
+}
+
+// 测量记录
+export const measureApi = {
+  mine: (params) => request.get('/measure', { params }),
+  pending: (params) => request.get('/measure/pending', { params }),
+  detail: (id) => request.get('/measure/' + id),
+  create: (data) => request.post('/measure', data),
+  update: (id, data) => request.put('/measure/' + id, data),
+  remove: (id) => request.delete('/measure/' + id),
+  convert: (id, data) => request.post('/measure/' + id + '/convert', data),
+}
+
+// 用户管理
+export const userApi = {
+  list: () => request.get('/users'),
+  create: (data) => request.post('/users', data),
+  update: (id, data) => request.put('/users/' + id, data),
+  resetPassword: (id, new_password) => request.put('/users/' + id + '/password', { new_password }),
+  remove: (id) => request.delete('/users/' + id),
+}
