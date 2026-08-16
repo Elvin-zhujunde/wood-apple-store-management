@@ -46,6 +46,7 @@ router.put(
   wrap(async (req, res) => {
     const { role, name } = req.body;
     if (role && !['boss', 'worker'].includes(role)) return fail(res, '角色只能是 boss 或 worker');
+    if (Number(req.params.id) === req.user.id && role && role !== 'boss') return fail(res, '不能降级自己');
     await pool.query(
       'UPDATE users SET role=COALESCE(?, role), name=COALESCE(?, name) WHERE id=?',
       [role || null, name || null, req.params.id]
