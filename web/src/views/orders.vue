@@ -13,6 +13,10 @@
         <el-option label="赊账中" value="赊账中" />
         <el-option label="已收款" value="已收款" />
       </el-select>
+      <el-select v-model="query.cut_status" placeholder="下料状态" clearable style="width:120px" @change="load">
+        <el-option label="未下料" value="未下料" />
+        <el-option label="已下料" value="已下料" />
+      </el-select>
       <el-date-picker v-model="query.dateRange" type="daterange" range-separator="至" start-placeholder="下单开始" end-placeholder="下单结束" value-format="YYYY-MM-DD" style="width:240px" @change="load" />
       <el-button type="primary" @click="load">查询</el-button>
       <el-button @click="resetQuery">重置</el-button>
@@ -20,21 +24,22 @@
       <el-button type="warning" :disabled="batchShipableCount === 0" @click="openBatchShip">批量发货 ({{ batchShipableCount }})</el-button>
       <el-button type="warning" :disabled="batchPayableCount === 0" @click="openBatchPay">批量收款 ({{ batchPayableCount }})</el-button>
       <el-button type="primary" :disabled="selectedRows.length === 0" @click="openBatchEdit">批量编辑 ({{ selectedRows.length }})</el-button>
+      <el-button type="warning" :disabled="selectedRows.length === 0" @click="openBatchPrint">打印下料单 ({{ selectedRows.length }})</el-button>
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
       <el-table-column type="selection" width="42" />
       <el-table-column prop="order_no" label="订单号" width="160" />
       <el-table-column prop="customer" label="客户" min-width="120" />
-      <el-table-column label="尺寸(高×宽)" width="130">
+      <el-table-column label="尺寸(高×宽)" width="150">
         <template #default="{ row }">
           <span v-if="row.door_h || row.door_w">{{ row.door_h || '-' }}×{{ row.door_w || '-' }}</span>
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="wall_thick" label="墙厚" width="70" align="center">
+      <el-table-column prop="wall_thick" label="墙厚" width="90" align="center">
         <template #default="{ row }">{{ row.wall_thick != null ? row.wall_thick : '-' }}</template>
       </el-table-column>
-      <el-table-column label="门扇(高×宽)" width="120">
+      <el-table-column label="门扇(高×宽)" width="150">
         <template #default="{ row }">
           <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ row.cut_door_height }}×{{ row.cut_door_width }}</span>
           <span v-else class="muted">未下料</span>
@@ -75,13 +80,17 @@
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="290" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === '新建'" link type="primary" class="row-btn" @click="openShip(row)">发货</el-button>
           <el-button v-if="row.status === '已发货' || row.status === '赊账中'" link type="success" class="row-btn" @click="openPay(row)">{{ row.status === '赊账中' ? '收尾款' : '收款' }}</el-button>
           <el-button v-if="row.status === '已收款'" link disabled class="row-btn">已完成</el-button>
           <el-button link type="primary" @click="openEdit(row)">详情</el-button>
-          <el-button link type="warning" @click="openCutting(row)">下料单</el-button>
+          <el-button v-if="!row.cut_status" link type="warning" class="row-btn" @click="openCutting(row)">下料</el-button>
+          <template v-else>
+            <el-button link type="warning" class="row-btn" @click="printSingle(row)">打印</el-button>
+            <el-button link type="primary" class="row-btn" @click="openCuttingEdit(row)">编辑</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -309,6 +318,54 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑下料单弹窗：改门扇尺寸/下料日期/经手人/加工备注，含删除下料 -->
+    <el-dialog v-model="cutEditVisible" title="编辑下料单" width="640px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:16px">
+        订单 <strong>{{ cutEditRow?.order_no }}</strong> · {{ cutEditRow?.customer }}
+        <span v-if="cutEditRow?.style"> · 款式 {{ cutEditRow?.style }}</span>
+        <span v-if="cutEditRow?.board"> · 板材 {{ cutEditRow?.board }}</span>
+      </el-alert>
+      <el-form :model="cutEditForm" label-width="90px" label-position="right">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="门洞高"><el-input :model-value="cutEditRow?.door_h" disabled /></el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门洞宽"><el-input :model-value="cutEditRow?.door_w" disabled /></el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门扇高" required>
+              <el-input-number v-model="cutEditForm.door_height" :min="0" :precision="2" controls-position="right" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="门扇宽" required>
+              <el-input-number v-model="cutEditForm.door_width" :min="0" :precision="2" controls-position="right" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="墙厚"><el-input :model-value="cutEditRow?.wall_thick" disabled /></el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="经手人"><el-input v-model="cutEditForm.handler" /></el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="下料日期" required>
+              <el-date-picker v-model="cutEditForm.cut_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="加工备注">
+          <TagInput v-model="cutEditForm.tags" :suggestions="cutTagOptions" placeholder="输入标签，回车添加" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button type="danger" plain @click="onCuttingDelete(cutEditRow)">删除下料</el-button>
+        <el-button @click="cutEditVisible = false">取消</el-button>
+        <el-button type="primary" @click="onCuttingEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 新增/编辑对话框（保留原完整表单） -->
     <el-dialog v-model="dlgVisible" :title="dlgTitle" width="960px" :close-on-click-modal="false">
       <el-tabs v-model="activeTab">
@@ -473,7 +530,7 @@ import TagInput from '../components/TagInput.vue'
 const store = useUserStore()
 const route = useRoute()
 const router = useRouter()
-const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 50 })
+const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 50 })
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
@@ -523,6 +580,21 @@ const cutRow = ref(null)
 const cutForm = ref({})
 const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 const cutTagOptions = ref([])
+// 下料单编辑（已下料订单：改门扇尺寸/下料日期/经手人/加工备注，含删除下料）
+const cutEditVisible = ref(false)
+const cutEditRow = ref(null)
+const cutEditForm = ref({})
+
+// remark_tags：DB 存 JSON.stringify 字符串数组，前端解析回数组
+function parseTags(raw) {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s) : []
+  } catch {
+    return []
+  }
+}
 
 const colorOptions = computed(() => {
   const bom = bomList.value.find((b) => b.id === form.value.door_bom_id)
@@ -725,7 +797,7 @@ async function load() {
 }
 
 function resetQuery() {
-  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 50 }
+  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 50 }
   if (route.query.status) query.value.status = String(route.query.status)
   load()
 }
@@ -853,16 +925,8 @@ async function onPay() {
   load()
 }
 
-// 生成下料单：先查该订单是否已有下料单，有则跳查看，无则弹窗（门扇高宽给默认值=门洞−扣尺，可改）
-async function openCutting(row) {
-  try {
-    const res = await cuttingApi.list({ order_no: row.order_no, pageSize: 1 })
-    if (res.data.total > 0) {
-      router.push('/cutting-list')
-      ElMessage.info('该订单已有下料单，已跳转下料单页')
-      return
-    }
-  } catch (e) {}
+// 生成下料单（未下料订单）：门扇高宽给默认值=门洞−扣尺，可改
+function openCutting(row) {
   if (row.door_h == null || row.door_w == null) {
     return ElMessage.warning('订单未录门洞尺寸，请先在订单详情补录')
   }
@@ -894,6 +958,63 @@ async function onCutting() {
   })
   ElMessage.success('下料单已生成（已下料）')
   cuttingVisible.value = false
+  load() // 刷新列表：下料状态/门扇列即时更新
+}
+
+// 编辑下料单（已下料订单）：行内"编辑"按钮入口
+function openCuttingEdit(row) {
+  cutEditRow.value = row
+  cutEditForm.value = {
+    door_height: Number(row.cut_door_height),
+    door_width: Number(row.cut_door_width),
+    handler: row.cut_handler || store.name,
+    cut_date: row.cut_date ? String(row.cut_date).slice(0, 10) : todayLocal(),
+    tags: parseTags(row.cut_remark_tags),
+  }
+  cutEditVisible.value = true
+}
+
+async function onCuttingEdit() {
+  const f = cutEditForm.value
+  if (!f.door_height || !f.door_width) return ElMessage.warning('门扇高/宽必填')
+  if (!f.cut_date) return ElMessage.warning('请填下料日期')
+  await cuttingApi.update(cutEditRow.value.id, {
+    door_height: f.door_height,
+    door_width: f.door_width,
+    cut_date: f.cut_date,
+    handler: f.handler,
+    remark_tags: JSON.stringify(f.tags),
+  })
+  ElMessage.success('已更新下料单')
+  cutEditVisible.value = false
+  load()
+}
+
+async function onCuttingDelete(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除下料单 #${row.id}（订单 ${row.order_no}）？删除后该订单回到"未下料"，可重新生成。`,
+      '删除确认',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  await cuttingApi.remove(row.id)
+  ElMessage.success('已删除下料单')
+  cutEditVisible.value = false
+  load()
+}
+
+// 打印：单条=单张表；批量=合并一张表（仅已下料可打印）
+function printSingle(row) {
+  router.push({ path: '/cutting-list/print', query: { mode: 'single', ids: row.id } })
+}
+function openBatchPrint() {
+  const cutRows = selectedRows.value.filter((r) => r.cut_status)
+  if (cutRows.length === 0) return ElMessage.warning('选中订单均未下料，无可打印下料单')
+  const ids = cutRows.map((r) => r.id).join(',')
+  router.push({ path: '/cutting-list/print', query: { mode: 'ledger', ids } })
 }
 
 onMounted(async () => {
@@ -919,6 +1040,8 @@ onUnmounted(() => {
 
 <style scoped>
 .muted { color: #909399; font-size: 12px; }
+/* 整表字号加大一号（14→15px），提升可读性 */
+:deep(.el-table) { font-size: 15px; }
 /* 欠款>0 输入框标红提示 */
 :deep(.balance-over .el-input__inner) { color: #f56c6c; font-weight: 600; }
 /* 移动端：行内操作按钮放大到手指好点 */

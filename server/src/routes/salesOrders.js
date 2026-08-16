@@ -10,7 +10,7 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { status, customer, order_no, keyword, door_bom_id, handler_sale, startDate, endDate, page = 1, pageSize = 20 } = req.query;
+    const { status, customer, order_no, keyword, door_bom_id, handler_sale, cut_status, startDate, endDate, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (status) {
@@ -36,6 +36,10 @@ router.get(
     if (handler_sale) {
       where.push('so.handler_sale LIKE ?');
       params.push(`%${handler_sale}%`);
+    }
+    if (cut_status) {
+      if (cut_status === '未下料') where.push('so.cut_status IS NULL');
+      else if (cut_status === '已下料') where.push('so.cut_status IS NOT NULL');
     }
     if (startDate) {
       where.push('so.order_date >= ?');
