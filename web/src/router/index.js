@@ -6,6 +6,8 @@ const routes = [
   { path: '/login', name: 'login', component: () => import('../views/login.vue') },
   // ARE-112：打印专用页，顶层路由（脱离 layout，无侧栏/导航），登录后任意角色可访问
   { path: '/cutting-list/print', name: 'cutting-list-print', component: () => import('../views/cuttingListPrint.vue'), meta: { title: '下料单打印' } },
+  // 标签打印专用页：4 种标签类型，window.print 实现，@page 按标签纸尺寸定纸张
+  { path: '/label/print', name: 'label-print', component: () => import('../views/labelPrint.vue'), meta: { title: '标签打印' } },
   {
     path: '/',
     component: () => import('../layout/index.vue'),

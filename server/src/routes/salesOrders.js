@@ -10,7 +10,7 @@ router.use(auth);
 router.get(
   '/',
   wrap(async (req, res) => {
-    const { status, customer, order_no, keyword, door_bom_id, handler_sale, cut_status, startDate, endDate, page = 1, pageSize = 20 } = req.query;
+    const { status, customer, order_no, keyword, door_bom_id, handler_sale, cut_status, ids, startDate, endDate, page = 1, pageSize = 20 } = req.query;
     const where = [];
     const params = [];
     if (status) {
@@ -41,6 +41,14 @@ router.get(
       if (cut_status === '未下料') where.push('so.cut_status IS NULL');
       else if (cut_status === '已下料') where.push('so.cut_status IS NOT NULL');
     }
+    if (ids) {
+      // 标签打印等场景按指定订单 id 批量取（逗号分隔），与 cutting-list /:ids 同款
+      const idArr = String(ids).split(',').map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+      if (idArr.length) {
+        where.push(`so.id IN (${idArr.map(() => '?').join(',')})`);
+        params.push(...idArr);
+      }
+    }
     if (startDate) {
       where.push('so.order_date >= ?');
       params.push(startDate);
@@ -62,6 +70,28 @@ router.get(
       )
     )[0];
     ok(res, { list: rows, total, page: Number(page), pageSize: Number(pageSize) });
+  })
+);
+
+// 锁孔常用联想：近期 N 条订单 lock_hole 去重（近期优先），供表单备选芯片
+// 静态路径，须在 /:id 之前声明，否则被参数路由吞
+router.get(
+  '/lock-holes',
+  wrap(async (req, res) => {
+    const SAMPLE = 500;
+    const [rows] = await pool.query(
+      "SELECT lock_hole FROM sales_orders WHERE lock_hole IS NOT NULL AND lock_hole != '' ORDER BY id DESC LIMIT ?",
+      [SAMPLE]
+    );
+    const seen = new Set();
+    const list = [];
+    for (const row of rows) {
+      if (row.lock_hole && !seen.has(row.lock_hole)) {
+        seen.add(row.lock_hole);
+        list.push(row.lock_hole);
+      }
+    }
+    ok(res, list);
   })
 );
 
@@ -189,6 +219,8 @@ router.post(
       // 台账对齐字段（ARE-105，开单时录入）
       door_h, door_w, wall_thick, style, board,
       remark, edge_band, frame_line, customer_type, address,
+      // 标签相关字段（lock_hole/sub_customer）
+      lock_hole, sub_customer,
     } = req.body;
     if (!customer || !door_bom_id || !color || !qty || !unit_price || !handler_sale || !order_date)
       return fail(res, '客户/门型/颜色/数量/单价/经手人/下单日期 必填');
@@ -199,15 +231,17 @@ router.post(
     // R4(ARE-107)：删除"约定发货日"录入，expected_ship_date 不再接收（DB字段保留给历史数据）
     const [r] = await pool.query(
       `INSERT INTO sales_orders
-        (order_no, customer, door_bom_id, color, qty, unit_price, total_amount,
+        (order_no, customer, sub_customer, door_bom_id, color, qty, unit_price, total_amount,
          handler_sale, order_date, status,
          door_h, door_w, wall_thick, style, board,
-         remark, edge_band, frame_line, customer_type, address)
-       VALUES (?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?)`,
-      [order_no, customer, door_bom_id, color, qty, unit_price, total_amount,
+         remark, edge_band, frame_line, customer_type, address,
+         hardware, lock_hole)
+       VALUES (?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?, ?, ?)`,
+      [order_no, customer, sub_customer || null, door_bom_id, color, qty, unit_price, total_amount,
        handler_sale, order_date,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
-       remark || null, edge_band || null, frame_line || null, customer_type || null, address || null]
+       remark || null, edge_band || null, frame_line || null, customer_type || null, address || null,
+       null, lock_hole || null]
     );
 
     // ARE-108：采购建议改为安全库存驱动，接单不再触发（领料/入库时触发）
@@ -228,6 +262,8 @@ router.put(
       remark, paid_amount, edge_band, frame_line,
       customer_type, address, hardware, pay_method,
       salesperson, installer, biz_fee,
+      // 标签相关字段（lock_hole/sub_customer）
+      lock_hole, sub_customer,
     } = req.body;
 
     // 日期归一：兼容 'YYYY-MM-DD' 与 ISO 'YYYY-MM-DDTHH:mm:ss.sssZ' 两种格式
@@ -272,22 +308,22 @@ router.put(
 
     await pool.query(
       `UPDATE sales_orders SET
-        customer=?, door_bom_id=?, color=?, qty=?, unit_price=?, total_amount=?,
+        customer=?, sub_customer=?, door_bom_id=?, color=?, qty=?, unit_price=?, total_amount=?,
         actual_ship_date=?, ship_no=?, handler_ship=?,
         pay_date=?, receipt_no=?, handler_finance=?, paid_amount=?,
         door_h=?, door_w=?, wall_thick=?, style=?, board=?,
         remark=?, edge_band=?, frame_line=?,
         customer_type=?, address=?, hardware=?, pay_method=?,
-        salesperson=?, installer=?, biz_fee=?,
+        salesperson=?, installer=?, biz_fee=?, lock_hole=?,
         status=?
        WHERE id=?`,
-      [customer, door_bom_id, color, qty, unit_price, total_amount,
+      [customer, sub_customer || null, door_bom_id, color, qty, unit_price, total_amount,
        normDate(actual_ship_date), ship_no || null, handler_ship || null,
        finalPayDate, finalReceiptNo, finalHandlerFinance, finalPaidAmount,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
        remark || null, edge_band || null, frame_line || null,
        customer_type || null, address || null, hardware || null, finalPayMethod,
-       salesperson || null, installer || null, biz_fee || null,
+       salesperson || null, installer || null, biz_fee || null, lock_hole || null,
        status, req.params.id]
     );
     ok(res, { status }, locked ? '已完成订单收款信息已锁定，状态保持已收款（如需修正请反结）' : '更新成功');

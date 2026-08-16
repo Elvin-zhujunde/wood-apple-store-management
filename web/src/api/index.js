@@ -36,6 +36,7 @@ export const orderApi = {
   batchShip: (data) => request.put('/sales-orders/batch/ship', data),
   batchPay: (data) => request.put('/sales-orders/batch/pay', data),
   batchUpdate: (data) => request.put('/sales-orders/batch/update', data),
+  lockHoles: () => request.get('/sales-orders/lock-holes'),
 }
 
 // 采购入库
@@ -76,6 +77,7 @@ export const cuttingApi = {
   remove: (id) => request.delete('/cutting-list/' + id),
   getConfig: () => request.get('/cutting-list/config'),
   getTags: () => request.get('/cutting-list/tags'),
+  batch: (data) => request.post('/cutting-list/batch', data),
 }
 
 // 工作台看板聚合

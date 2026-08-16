@@ -25,6 +25,8 @@
       <el-button type="warning" :disabled="batchPayableCount === 0" @click="openBatchPay">批量收款 ({{ batchPayableCount }})</el-button>
       <el-button type="primary" :disabled="selectedRows.length === 0" @click="openBatchEdit">批量编辑 ({{ selectedRows.length }})</el-button>
       <el-button type="warning" :disabled="selectedRows.length === 0" @click="openBatchPrint">打印下料单 ({{ selectedRows.length }})</el-button>
+      <el-button type="success" :disabled="selectedRows.length === 0" @click="openBatchLabel">标签打印 ({{ selectedRows.length }})</el-button>
+      <el-button type="primary" :disabled="batchCuttableCount === 0" @click="openBatchCut">批量下料 ({{ batchCuttableCount }})</el-button>
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
       <el-table-column type="selection" width="42" />
@@ -52,6 +54,14 @@
         </template>
       </el-table-column>
       <el-table-column prop="cut_date" label="下料日" width="110" :formatter="dateFmt" />
+      <el-table-column label="加工备注" min-width="120">
+        <template #default="{ row }">
+          <span v-if="parseTags(row.cut_remark_tags).length" class="tag-row">
+            <el-tag v-for="(t, i) in parseTags(row.cut_remark_tags)" :key="i" size="small" :type="tagType(t)" class="tag-item">{{ t }}</el-tag>
+          </span>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="door_bom_name" label="门型" width="120" />
       <el-table-column prop="color" label="颜色" width="80" />
       <el-table-column label="应收" width="90" align="right" prop="total_amount" />
@@ -90,6 +100,7 @@
           <template v-else>
             <el-button link type="warning" class="row-btn" @click="printSingle(row)">打印</el-button>
             <el-button link type="primary" class="row-btn" @click="openCuttingEdit(row)">编辑</el-button>
+            <el-button link type="success" class="row-btn" @click="openLabel(row)">标签</el-button>
           </template>
         </template>
       </el-table-column>
@@ -366,6 +377,68 @@
       </template>
     </el-dialog>
 
+    <!-- 批量下料弹窗：按门洞高×宽分组，同组共用门扇尺寸 -->
+    <el-dialog v-model="batchCutVisible" title="批量下料" width="760px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        选中 <strong>{{ selectedRows.length }}</strong> 单，其中 <strong>{{ batchCuttableCount }}</strong> 单未下料可批量生成。
+        <div class="muted" style="margin-top:4px">按门洞高×宽分组，同组共用门扇尺寸（门洞−扣尺默认，可改）；已下料单自动跳过。</div>
+      </el-alert>
+      <el-form :model="batchCutForm" label-width="90px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="下料日期" required>
+              <el-date-picker v-model="batchCutForm.cut_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="经手人">
+              <el-input v-model="batchCutForm.handler" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="加工备注">
+          <TagInput v-model="batchCutForm.tags" :suggestions="cutTagOptions" placeholder="输入标签，回车添加" />
+        </el-form-item>
+      </el-form>
+      <div class="batch-cut-groups">
+        <div v-for="g in batchCutGroups" :key="g.key" class="batch-cut-group">
+          <div class="group-head">
+            <span class="group-size">门洞 {{ g.hole }}（{{ g.items.length }} 单）</span>
+            <span class="muted">门扇高×宽：</span>
+            <el-input-number v-model="g.door_height" :min="0" :precision="2" controls-position="right" style="width:120px" size="small" />
+            <span style="margin:0 4px">×</span>
+            <el-input-number v-model="g.door_width" :min="0" :precision="2" controls-position="right" style="width:120px" size="small" />
+          </div>
+          <div class="group-orders">
+            <el-tag v-for="(it, i) in g.items" :key="i" size="small" style="margin:2px">{{ it.order_no }} · {{ it.customer }}</el-tag>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="batchCutVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="batchCuttableCount === 0" @click="onBatchCut">确认批量下料</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 标签打印选择弹窗：4 种标签类型 -->
+    <el-dialog v-model="labelVisible" title="标签打印" width="520px" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        订单 <strong>{{ labelRow?.order_no }}</strong> · {{ labelRow?.customer }}
+        <span v-if="labelRow?.sub_customer"> · {{ labelRow.sub_customer }}</span>
+        <div class="muted" style="margin-top:4px">选标签类型后跳打印页；标签内容取订单字段（锁孔/子客户请在订单详情维护）。</div>
+      </el-alert>
+      <el-radio-group v-model="labelType" class="label-radio-group">
+        <el-radio-button label="door-in">门扇内标签<br /><span class="muted">40×50mm</span></el-radio-button>
+        <el-radio-button label="door-out">门扇外标签<br /><span class="muted">40×80mm</span></el-radio-button>
+        <el-radio-button label="frame">门套标签<br /><span class="muted">40×80mm</span></el-radio-button>
+        <el-radio-button label="frame-in">门套内标签<br /><span class="muted">40×30mm</span></el-radio-button>
+      </el-radio-group>
+      <template #footer>
+        <el-button @click="labelVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!labelType" @click="labelRow ? printLabel() : printBatchLabel()">打印</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 新增/编辑对话框（保留原完整表单） -->
     <el-dialog v-model="dlgVisible" :title="dlgTitle" width="960px" :close-on-click-modal="false">
       <el-tabs v-model="activeTab">
@@ -426,7 +499,7 @@
               <!-- 可选信息（默认收起，降低录入负担） -->
               <el-col :span="24">
                 <el-collapse>
-                  <el-collapse-item title="可选信息（客户类别/地址/包边/套板线条/五金/业务员）" name="opt">
+                  <el-collapse-item title="可选信息（客户类别/地址/包边/套板线条/五金/业务员/锁孔/子客户）" name="opt">
                     <el-row :gutter="12">
                       <el-col :span="12"><el-form-item label="客户类别"><el-select v-model="form.customer_type" clearable style="width:100%"><el-option label="经销商" value="经销商" /><el-option label="直销" value="直销" /></el-select></el-form-item></el-col>
                       <el-col :span="12"><el-form-item label="地址"><el-input v-model="form.address" /></el-form-item></el-col>
@@ -434,6 +507,14 @@
                       <el-col :span="12"><el-form-item label="套板线条"><el-input v-model="form.frame_line" /></el-form-item></el-col>
                       <el-col :span="12"><el-form-item label="五金"><el-input v-model="form.hardware" /></el-form-item></el-col>
                       <el-col :span="12"><el-form-item label="业务员"><el-input v-model="form.salesperson" /></el-form-item></el-col>
+                      <el-col :span="12">
+                        <el-form-item label="锁孔">
+                          <el-select v-model="form.lock_hole" allow-create filterable clearable default-first-option style="width:100%" placeholder="如 58锁子孔">
+                            <el-option v-for="h in lockHoleOptions" :key="h" :label="h" :value="h" />
+                          </el-select>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="12"><el-form-item label="子客户"><el-input v-model="form.sub_customer" placeholder="如 碧桂园X栋X层X房（安装定位）" /></el-form-item></el-col>
                     </el-row>
                   </el-collapse-item>
                 </el-collapse>
@@ -522,6 +603,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
+import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '../store/user'
 import ImageUpload from '../components/ImageUpload.vue'
@@ -580,10 +662,16 @@ const cutRow = ref(null)
 const cutForm = ref({})
 const cutConfig = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 const cutTagOptions = ref([])
+const lockHoleOptions = ref([]) // 锁孔常用备选（近期去重，订单表单 el-select 备选）
 // 下料单编辑（已下料订单：改门扇尺寸/下料日期/经手人/加工备注，含删除下料）
 const cutEditVisible = ref(false)
 const cutEditRow = ref(null)
 const cutEditForm = ref({})
+// 批量下料（未下料订单：按门洞高×宽分组，同组共用门扇尺寸）
+const batchCutVisible = ref(false)
+const batchCutForm = ref({})
+const batchCutGroups = ref([])
+const batchCuttableCount = computed(() => selectedRows.value.filter((r) => !r.cut_status && r.door_h != null && r.door_w != null).length)
 
 // remark_tags：DB 存 JSON.stringify 字符串数组，前端解析回数组
 function parseTags(raw) {
@@ -807,10 +895,11 @@ function openAdd() {
   dlgTitle.value = '接单'
   activeTab.value = 'info'
   form.value = {
-    customer: '', door_bom_id: '', color: '', qty: 1, unit_price: 0,
+    customer: '', sub_customer: '', door_bom_id: '', color: '', qty: 1, unit_price: 0,
     handler_sale: store.name, order_date: today(),
     door_h: null, door_w: null, wall_thick: null, style: '', board: '',
     remark: '', edge_band: null, frame_line: '', customer_type: '', address: '',
+    lock_hole: '',
   }
   dlgVisible.value = true
 }
@@ -1017,10 +1106,87 @@ function openBatchPrint() {
   router.push({ path: '/cutting-list/print', query: { mode: 'ledger', ids } })
 }
 
+// 标签打印（4 种类型）：订单行"标签"按钮 → 选类型 → 跳 labelPrint 页
+const labelVisible = ref(false)
+const labelRow = ref(null)
+const labelType = ref('')
+function openLabel(row) {
+  labelRow.value = row
+  labelType.value = 'door-in'
+  labelVisible.value = true
+}
+function printLabel() {
+  if (!labelType.value || !labelRow.value) return
+  router.push({ path: '/label/print', query: { type: labelType.value, ids: labelRow.value.id } })
+  labelVisible.value = false
+}
+// 批量标签：工具栏入口（选多单同类型打印）
+function openBatchLabel() {
+  if (selectedRows.value.length === 0) return ElMessage.warning('请先勾选订单')
+  labelRow.value = null
+  labelType.value = 'door-in'
+  labelVisible.value = true
+}
+function printBatchLabel() {
+  if (!labelType.value) return ElMessage.warning('请选标签类型')
+  const ids = selectedRows.value.map((r) => r.id).join(',')
+  router.push({ path: '/label/print', query: { type: labelType.value, ids } })
+  labelVisible.value = false
+}
+
+// 批量下料：按门洞高×宽分组，同组共用门扇尺寸（门洞−扣尺默认，可改）
+function openBatchCut() {
+  const dh = Number(cutConfig.value.defaultHeightCut)
+  const dw = Number(cutConfig.value.defaultWidthCut)
+  const uncut = selectedRows.value.filter((r) => !r.cut_status && r.door_h != null && r.door_w != null)
+  if (uncut.length === 0) return ElMessage.warning('选中订单均无未下料或未录门洞尺寸，不可批量下料')
+  // 按 door_h×door_w 分组
+  const map = new Map()
+  for (const r of uncut) {
+    const key = `${r.door_h}×${r.door_w}`
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        hole: key,
+        door_height: Number(r.door_h) - dh,
+        door_width: Number(r.door_w) - dw,
+        items: [],
+      })
+    }
+    map.get(key).items.push({ order_id: r.id, order_no: r.order_no, customer: r.customer })
+  }
+  batchCutGroups.value = [...map.values()]
+  batchCutForm.value = { cut_date: todayLocal(), handler: store.name, tags: [] }
+  batchCutVisible.value = true
+}
+
+async function onBatchCut() {
+  const f = batchCutForm.value
+  if (!f.cut_date) return ElMessage.warning('请填下料日期')
+  // 展开分组为 items（每组共用其 door_height/door_width）
+  const items = []
+  for (const g of batchCutGroups.value) {
+    if (!g.door_height || !g.door_width) return ElMessage.warning(`门洞 ${g.hole} 组门扇尺寸未填`)
+    for (const it of g.items) {
+      items.push({ order_id: it.order_id, door_height: g.door_height, door_width: g.door_width })
+    }
+  }
+  const res = await cuttingApi.batch({
+    items,
+    cut_date: f.cut_date,
+    handler: f.handler,
+    remark_tags: JSON.stringify(f.tags),
+  })
+  ElMessage.success(res.msg || '批量下料完成')
+  batchCutVisible.value = false
+  load()
+}
+
 onMounted(async () => {
   bomList.value = (await bomApi.all()).data
   cutConfig.value = (await cuttingApi.getConfig()).data
   cutTagOptions.value = (await cuttingApi.getTags()).data || []
+  try { lockHoleOptions.value = (await orderApi.lockHoles()).data || [] } catch (e) {}
   // 工作台待办跳转带 status query，自动筛选
   if (route.query.status) {
     query.value.status = String(route.query.status)
@@ -1040,6 +1206,16 @@ onUnmounted(() => {
 
 <style scoped>
 .muted { color: #909399; font-size: 12px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-item { margin: 0; }
+/* 批量下料分组列表 */
+.batch-cut-groups { max-height: 320px; overflow-y: auto; }
+.batch-cut-group { border: 1px solid #ebeef5; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }
+.batch-cut-group .group-head { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.batch-cut-group .group-size { font-weight: 600; margin-right: 8px; }
+.batch-cut-group .group-orders { line-height: 1.6; }
+/* 标签类型选择按钮内换行 */
+.label-radio-group .el-radio-button__inner { line-height: 1.4; padding: 8px 14px; }
 /* 整表字号加大一号（14→15px），提升可读性 */
 :deep(.el-table) { font-size: 15px; }
 /* 欠款>0 输入框标红提示 */

@@ -44,6 +44,53 @@ router.get(
   })
 );
 
+// 批量下料：勾选多单未下料订单，按门洞高×宽分组同组共用门扇尺寸（门洞−扣尺默认，可改）
+// 已下料单跳过；返回每单结果（success/skipped）
+// 静态路径，须在 /:id 之前声明
+router.post(
+  '/batch',
+  wrap(async (req, res) => {
+    const { items, cut_date, handler, remark_tags } = req.body;
+    // items: [{ order_id, door_height, door_width }]（前端按门洞分组后每组共用尺寸）
+    if (!Array.isArray(items) || items.length === 0) return fail(res, '缺少下料条目');
+    if (!cut_date) return fail(res, '请填下料日期');
+
+    const results = [];
+    for (const it of items) {
+      const oid = Number(it.order_id);
+      if (!oid) { results.push({ order_id: it.order_id, ok: false, reason: '非法订单 id' }); continue; }
+      const [orders] = await pool.query(
+        'SELECT id, door_h, door_w, cut_status FROM sales_orders WHERE id = ?',
+        [oid]
+      );
+      if (orders.length === 0) { results.push({ order_id: oid, ok: false, reason: '订单不存在' }); continue; }
+      const o = orders[0];
+      if (o.cut_status) { results.push({ order_id: oid, ok: false, reason: '已下料，跳过' }); continue; }
+      if (o.door_h == null || o.door_w == null) { results.push({ order_id: oid, ok: false, reason: '未录门洞尺寸' }); continue; }
+
+      // 门扇尺寸：前端分组已算好传入；兜底用门洞−默认扣尺
+      let fh = Number(it.door_height);
+      let fw = Number(it.door_width);
+      if (!fh || !fw) {
+        fh = Number(o.door_h) - Number(config.cutting.defaultHeightCut);
+        fw = Number(o.door_w) - Number(config.cutting.defaultWidthCut);
+      }
+
+      await pool.query(
+        `UPDATE sales_orders SET
+          cut_door_height=?, cut_door_width=?, cut_mode=1, cut_status='已下料',
+          cut_date=COALESCE(?, CURDATE()), cut_handler=?, cut_remark_tags=?
+         WHERE id=?`,
+        [fh, fw, cut_date || null, handler || null, remark_tags || null, oid]
+      );
+      results.push({ order_id: oid, ok: true });
+    }
+    const success = results.filter((r) => r.ok).length;
+    const skipped = results.length - success;
+    ok(res, { results, success, skipped }, `批量下料完成：${success} 单成功${skipped ? `，${skipped} 单跳过` : ''}`);
+  })
+);
+
 // 列表（分页+筛选，只列已下料的订单 cut_status 非空）
 // 字段映射回前端原命名：door_h→hole_height / door_w→hole_width / cut_*→原下料字段名
 router.get(
