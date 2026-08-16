@@ -21,7 +21,7 @@
       <el-button type="warning" :disabled="batchPayableCount === 0" @click="openBatchPay">批量收款 ({{ batchPayableCount }})</el-button>
       <el-button type="primary" :disabled="selectedRows.length === 0" @click="openBatchEdit">批量编辑 ({{ selectedRows.length }})</el-button>
     </div>
-    <el-table ref="tableRef" :data="list" stripe border @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
+    <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
       <el-table-column type="selection" width="42" />
       <el-table-column prop="order_no" label="订单号" width="160" />
       <el-table-column prop="customer" label="客户" min-width="120" />
@@ -71,11 +71,13 @@
     </el-table>
     <el-pagination
       v-model:current-page="query.page"
-      :page-size="query.pageSize"
+      v-model:page-size="query.pageSize"
       :total="total"
-      layout="total, prev, pager, next"
+      :page-sizes="[20, 50, 100, 200]"
+      layout="total, sizes, prev, pager, next, jumper"
       style="margin-top:12px"
       @current-change="load"
+      @size-change="onSizeChange"
     />
 
     <!-- 行内发货小弹窗 -->
@@ -450,10 +452,21 @@ import TagInput from '../components/TagInput.vue'
 const store = useUserStore()
 const route = useRoute()
 const router = useRouter()
-const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 20 })
+const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 50 })
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
+
+// 表格固定滚动高度：搜索条件固定不滚，只有表格表体内部滚动
+// 按窗口高度动态算（留出搜索区/分页/卡片边距约 280px），最小 300 保证小屏可用
+const tableHeight = ref(Math.max(300, window.innerHeight - 280))
+function onResize() { tableHeight.value = Math.max(300, window.innerHeight - 280) }
+
+// 切换每页条数：回到第1页重载
+function onSizeChange() {
+  query.value.page = 1
+  load()
+}
 
 const dlgVisible = ref(false)
 const dlgTitle = ref('')
@@ -687,7 +700,7 @@ async function load() {
 }
 
 function resetQuery() {
-  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 20 }
+  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', dateRange: [], page: 1, pageSize: 50 }
   if (route.query.status) query.value.status = String(route.query.status)
   load()
 }
@@ -866,11 +879,13 @@ onMounted(async () => {
   load()
   window.addEventListener('keydown', onShiftDown)
   window.addEventListener('keyup', onShiftUp)
+  window.addEventListener('resize', onResize)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onShiftDown)
   window.removeEventListener('keyup', onShiftUp)
+  window.removeEventListener('resize', onResize)
 })
 </script>
 
