@@ -29,12 +29,17 @@ const refreshing = ref(false)
 const page = ref(0)
 const onLoad = async () => {
   page.value++
-  const { data } = await measureApi.mine({ page: page.value, size: 20 })
-  list.value.push(...data)
-  loading.value = false
-  if (data.length < 20) finished.value = true
+  try {
+    const { data } = await measureApi.mine({ page: page.value, size: 20 })
+    list.value.push(...data)
+    if (data.length < 20) finished.value = true
+  } catch (e) {
+    page.value--   // 回退分页，避免重试跳页
+  } finally {
+    loading.value = false
+  }
 }
-const onRefresh = () => { list.value=[]; page.value=0; finished.value=false; onLoad(); refreshing.value=false }
+const onRefresh = async () => { list.value=[]; page.value=0; finished.value=false; await onLoad(); refreshing.value=false }
 const onLogout = () => { store.logout(); router.replace('/m/login') }
 </script>
 <style scoped>

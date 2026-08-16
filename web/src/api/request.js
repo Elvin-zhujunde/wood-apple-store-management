@@ -29,7 +29,7 @@ request.interceptors.response.use(
       ElMessage.error(msg || '登录已过期')
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      router.push('/login')
+      router.push(window.location.pathname.startsWith('/m') ? '/m/login' : '/login')
     } else {
       ElMessage.error(msg || '网络错误')
     }
