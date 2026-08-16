@@ -28,6 +28,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/purchase-suggestion', require('./routes/purchaseSuggestion'));
 app.use('/api/attachments', require('./routes/attachments'));
 app.use('/api/customers', require('./routes/customers'));
+app.use('/api/measure', require('./routes/measure'));
 
 // 404
 app.use((req, res) => res.status(404).json({ code: 404, msg: '接口不存在', data: null }));
