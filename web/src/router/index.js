@@ -28,6 +28,7 @@ const routes = [
       { path: 'requisition', name: 'requisition', component: () => import('../views/requisition.vue'), meta: { title: '生产领料' } },
       { path: 'materials', name: 'materials', component: () => import('../views/materials.vue'), meta: { title: '物料档案' } },
       { path: 'door-bom', name: 'door-bom', component: () => import('../views/doorBom.vue'), meta: { title: '门型BOM' } },
+      { path: 'customers', name: 'customers', component: () => import('../views/customers.vue'), meta: { title: '客户档案' } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
