@@ -81,7 +81,7 @@ router.post(
 router.put(
   '/:id',
   wrap(async (req, res) => {
-    const { name, category, spec, unit, safety_stock, origin_place, manufacturer, unit_price = 0 } = req.body;
+    const { name, category, spec, unit, safety_stock = 0, origin_place, manufacturer, unit_price = 0 } = req.body;
     await pool.query(
       'UPDATE materials SET name=?, category=?, spec=?, unit=?, safety_stock=?, origin_place=?, manufacturer=?, unit_price=? WHERE id=?',
       [name, category, spec, unit, safety_stock, origin_place || null, manufacturer || null, Number(unit_price) || 0, req.params.id]
