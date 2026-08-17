@@ -156,8 +156,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { measureApi, bomApi } from '../api/index'
 import { imgUrl } from '../utils/file'
+import { useUserStore } from '../store/user'
 
 const router = useRouter()
+const store = useUserStore()
 const list = ref([]), kw = ref(''), statusFilter = ref(''), loading = ref(false)
 const selection = ref([])
 const drawer = ref(false), cur = ref(null)
@@ -180,12 +182,12 @@ const openDetail = async (row) => {
 const goOrders = (row) => { router.push('/orders') }   // v1: 跳订单列表; v2 加 ?focus=so_id 深度定位
 // 批量转单：选中 N 条 → 统一字段 + 逐条覆盖 → batch-convert
 const batchDlg = ref(false), batching = ref(false)
-const batchCommon = ref({ door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: '', order_date: new Date().toISOString().slice(0,10), lock_hole: '', style: '', board: '' })
+const batchCommon = ref({ door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0,10), lock_hole: '', style: '', board: '' })
 const batchRows = ref([])   // [{id, customer_name, location_name, door_h, door_w, wall_thick, override:false, form:{door_bom_id,color,qty,unit_price}}]
 const onBatchConvert = async () => {
   if (selection.value.length === 0) return
   if (!bomList.value.length) { const { data } = await bomApi.all(); bomList.value = data }
-  batchCommon.value = { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: '', order_date: new Date().toISOString().slice(0,10), lock_hole: '', style: '', board: '' }
+  batchCommon.value = { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0,10), lock_hole: '', style: '', board: '' }
   batchRows.value = selection.value.map(r => ({ id: r.id, customer_name: r.customer_name, location_name: r.location_name, door_h: r.door_h, door_w: r.door_w, wall_thick: r.wall_thick, override: false, form: { door_bom_id: null, color: '', qty: 1, unit_price: 0 } }))
   batchDlg.value = true
 }
@@ -221,12 +223,12 @@ const doBatchConvert = async () => {
 }
 // 单条快捷转单：复用现有 measureApi.convert（简易表单，门型下拉 mirror orders.vue）
 const convDlg = ref(false), convRow = ref(null), converting = ref(false)
-const convForm = ref({ door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: '', order_date: new Date().toISOString().slice(0, 10), lock_hole: '', style: '', board: '' })
+const convForm = ref({ door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0, 10), lock_hole: '', style: '', board: '' })
 const bomList = ref([])
 const onQuickConvert = async (row) => {
   convRow.value = row
   if (!bomList.value.length) { const { data } = await bomApi.all(); bomList.value = data }
-  convForm.value = { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: '', order_date: new Date().toISOString().slice(0, 10), lock_hole: '', style: '', board: '' }
+  convForm.value = { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0, 10), lock_hole: '', style: '', board: '' }
   convDlg.value = true
 }
 const onConvBomChange = (id) => { const b = bomList.value.find((x) => x.id === id); if (b) convForm.value.color = b.colors?.split(',')[0] || '' }
