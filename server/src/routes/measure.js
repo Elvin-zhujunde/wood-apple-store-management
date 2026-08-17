@@ -60,15 +60,51 @@ router.get(
   })
 );
 
+// 全量列表（桌面测量记录页，boss，含已转单+关联订单号）
+router.get(
+  '/all',
+  requireRole('boss'),
+  wrap(async (req, res) => {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const size = Math.min(100, Number(req.query.size) || 20);
+    const keyword = req.query.keyword || '';
+    const status = req.query.status || '';
+    const where = [];
+    const params = [];
+    if (keyword) {
+      where.push('(c.name LIKE ? OR l.name LIKE ?)');
+      params.push(`%${keyword}%`, `%${keyword}%`);
+    }
+    if (status) { where.push('m.status = ?'); params.push(status); }
+    const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const [rows] = await pool.query(
+      `SELECT m.id, m.customer_id, m.location_id, m.door_h, m.door_w, m.wall_thick,
+              m.remark, m.measured_by, m.measured_at, m.status, m.sales_order_id,
+              c.name AS customer_name, l.name AS location_name,
+              so.order_no AS order_no,
+              (SELECT COUNT(*) FROM attachments a WHERE a.entity_type='measure' AND a.entity_id=m.id) AS photo_count
+       FROM measure_records m
+       LEFT JOIN customers c ON c.id = m.customer_id
+       LEFT JOIN customer_locations l ON l.id = m.location_id
+       LEFT JOIN sales_orders so ON so.id = m.sales_order_id
+       ${whereSql}
+       ORDER BY m.id DESC LIMIT ? OFFSET ?`,
+      [...params, size, (page - 1) * size]
+    );
+    ok(res, rows);
+  })
+);
+
 // 详情（含照片）
 router.get(
   '/:id',
   wrap(async (req, res) => {
     const [rows] = await pool.query(
-      `SELECT m.*, c.name AS customer_name, l.name AS location_name
+      `SELECT m.*, c.name AS customer_name, l.name AS location_name, so.order_no AS order_no
        FROM measure_records m
        LEFT JOIN customers c ON c.id = m.customer_id
        LEFT JOIN customer_locations l ON l.id = m.location_id
+       LEFT JOIN sales_orders so ON so.id = m.sales_order_id
        WHERE m.id = ? AND (m.measured_by = ? OR ? = 'boss')`,
       [req.params.id, req.user.name, req.user.role]
     );
@@ -227,6 +263,73 @@ router.post(
 
       await conn.commit();
       ok(res, { order_no, sales_order_id: soId }, '转单成功');
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  })
+);
+
+// 批量转单（boss，单事务循环转 N 单）
+router.post(
+  '/batch-convert',
+  requireRole('boss'),
+  wrap(async (req, res) => {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    if (items.length === 0) return fail(res, '请选择要转单的记录');
+    const conn = await pool.getConnection();
+    const results = [];
+    let success = 0, skipped = 0;
+    try {
+      await conn.beginTransaction();
+      for (const item of items) {
+        const { id, door_bom_id, color, qty, unit_price, handler_sale, order_date,
+                lock_hole, style, board } = item;
+        // 6 必填校验，缺则跳过
+        if (!id || !door_bom_id || !color || !qty || !unit_price || !handler_sale || !order_date) {
+          skipped++; results.push({ id, skipped: true, reason: '字段缺失' }); continue;
+        }
+        const [ms] = await conn.query(
+          `SELECT m.*, c.name AS customer_name, l.name AS location_name
+           FROM measure_records m
+           JOIN customers c ON c.id = m.customer_id
+           JOIN customer_locations l ON l.id = m.location_id
+           WHERE m.id = ? FOR UPDATE`,
+          [id]
+        );
+        if (ms.length === 0) { skipped++; results.push({ id, skipped: true, reason: '记录不存在' }); continue; }
+        const m = ms[0];
+        if (m.status !== '待转单') { skipped++; results.push({ id, skipped: true, reason: '已转单' }); continue; }
+
+        const order_no = await genDocNo('sales_orders', 'SO', 'order', conn);
+        const total_amount = qty * Number(unit_price);
+        const remarkMerged = m.remark ? `[现场测量] ${m.remark}` : '[现场测量]';
+        const [r] = await conn.query(
+          `INSERT INTO sales_orders
+            (order_no, customer, sub_customer, door_bom_id, color, qty, unit_price, total_amount,
+             handler_sale, order_date, status,
+             door_h, door_w, wall_thick, remark, hardware, lock_hole, style, board)
+           VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?, NULL, ?, ?, ?)`,
+          [order_no, m.customer_name, m.location_name, door_bom_id, color, qty, unit_price, total_amount,
+           handler_sale, order_date,
+           m.door_h, m.door_w, m.wall_thick, remarkMerged,
+           lock_hole || null, style || null, board || null]
+        );
+        const soId = r.insertId;
+        await conn.query(
+          "UPDATE attachments SET entity_type='sales_order', entity_id=? WHERE entity_type='measure' AND entity_id=?",
+          [soId, id]
+        );
+        await conn.query(
+          "UPDATE measure_records SET status='已转单', sales_order_id=? WHERE id=?",
+          [soId, id]
+        );
+        success++; results.push({ id, order_no, sales_order_id: soId });
+      }
+      await conn.commit();
+      ok(res, { success, skipped, results }, '批量转单完成');
     } catch (e) {
       await conn.rollback();
       throw e;
