@@ -100,6 +100,54 @@
         <el-button type="primary" :loading="converting" @click="doConvert">确认转单</el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量转单弹窗（统一字段 + 逐条覆盖） -->
+    <el-dialog v-model="batchDlg" title="批量转单" width="860px" :close-on-click-modal="false">
+      <div class="batch-common">
+        <div class="batch-common-title">统一设置（未勾选「覆盖」的行用此值）</div>
+        <el-form :model="batchCommon" label-width="80px" size="small">
+          <el-form-item label="门型"><el-select v-model="batchCommon.door_bom_id" filterable @change="onBatchBomChange" style="width:100%"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select></el-form-item>
+          <div style="display:flex;gap:12px">
+            <el-form-item label="颜色" style="flex:1"><el-input v-model="batchCommon.color" /></el-form-item>
+            <el-form-item label="数量" style="width:120px"><el-input-number v-model="batchCommon.qty" :min="1" /></el-form-item>
+            <el-form-item label="单价" style="width:140px"><el-input-number v-model="batchCommon.unit_price" :min="0" :precision="2" /></el-form-item>
+          </div>
+          <div style="display:flex;gap:12px">
+            <el-form-item label="经手人" style="flex:1"><el-input v-model="batchCommon.handler_sale" /></el-form-item>
+            <el-form-item label="下单日期" style="width:180px"><el-date-picker v-model="batchCommon.order_date" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+          </div>
+          <div style="display:flex;gap:12px">
+            <el-form-item label="锁孔" style="flex:1"><el-input v-model="batchCommon.lock_hole" /></el-form-item>
+            <el-form-item label="款式" style="flex:1"><el-input v-model="batchCommon.style" /></el-form-item>
+            <el-form-item label="板材" style="flex:1"><el-input v-model="batchCommon.board" /></el-form-item>
+          </div>
+        </el-form>
+      </div>
+      <div class="batch-rows-title">待转单记录 ({{ batchRows.length }})</div>
+      <el-table :data="batchRows" border size="small" max-height="300">
+        <el-table-column prop="customer_name" label="客户" min-width="100" />
+        <el-table-column prop="location_name" label="定位" min-width="100" />
+        <el-table-column label="尺寸" width="140"><template #default="{row}">{{ row.door_h }}×{{ row.door_w }} 墙{{ row.wall_thick }}</template></el-table-column>
+        <el-table-column label="覆盖" width="70">
+          <template #default="{row}"><el-checkbox v-model="row.override" /></template>
+        </el-table-column>
+        <el-table-column label="覆盖字段（勾选「覆盖」后可编辑）" min-width="320">
+          <template #default="{row}">
+            <div v-if="row.override" style="display:flex;gap:6px;flex-wrap:wrap">
+              <el-select v-model="row.form.door_bom_id" filterable placeholder="门型" style="width:140px"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select>
+              <el-input v-model="row.form.color" placeholder="颜色" style="width:90px" />
+              <el-input-number v-model="row.form.qty" :min="1" placeholder="数量" style="width:90px" />
+              <el-input-number v-model="row.form.unit_price" :min="0" :precision="2" placeholder="单价" style="width:110px" />
+            </div>
+            <span v-else style="color:var(--el-color-info)">用统一值</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="batchDlg=false">取消</el-button>
+        <el-button type="primary" :loading="batching" @click="doBatchConvert">确认批量转单</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -130,10 +178,46 @@ const openDetail = async (row) => {
   drawer.value = true
 }
 const goOrders = (row) => { router.push('/orders') }   // v1: 跳订单列表; v2 加 ?focus=so_id 深度定位
-// 批量转单：Task 3 接入弹窗。此处先提示选中数量，避免按钮空响应。
-const onBatchConvert = () => {
+// 批量转单：选中 N 条 → 统一字段 + 逐条覆盖 → batch-convert
+const batchDlg = ref(false), batching = ref(false)
+const batchCommon = ref({ door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: '', order_date: new Date().toISOString().slice(0,10), lock_hole: '', style: '', board: '' })
+const batchRows = ref([])   // [{id, customer_name, location_name, door_h, door_w, wall_thick, override:false, form:{door_bom_id,color,qty,unit_price}}]
+const onBatchConvert = async () => {
   if (selection.value.length === 0) return
-  ElMessage.info('批量转单弹窗待 Task 3 接入，当前已选 ' + selection.value.length + ' 条')
+  if (!bomList.value.length) { const { data } = await bomApi.all(); bomList.value = data }
+  batchCommon.value = { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: '', order_date: new Date().toISOString().slice(0,10), lock_hole: '', style: '', board: '' }
+  batchRows.value = selection.value.map(r => ({ id: r.id, customer_name: r.customer_name, location_name: r.location_name, door_h: r.door_h, door_w: r.door_w, wall_thick: r.wall_thick, override: false, form: { door_bom_id: null, color: '', qty: 1, unit_price: 0 } }))
+  batchDlg.value = true
+}
+const onBatchBomChange = (id) => { const b = bomList.value.find((x) => x.id === id); if (b) batchCommon.value.color = b.colors?.split(',')[0] || '' }
+const doBatchConvert = async () => {
+  const c = batchCommon.value
+  if (!c.door_bom_id || !c.color || !c.qty || !c.unit_price || !c.handler_sale || !c.order_date) {
+    ElMessage.warning('统一设置：门型/颜色/数量/单价/经手人/下单日期 必填'); return
+  }
+  // 构造 items：覆盖行用 row.form（4 字段）+ 统一（其余 5 字段）；非覆盖行全用统一
+  const items = batchRows.value.map(r => {
+    if (r.override) {
+      const f = r.form
+      if (!f.door_bom_id || !f.color || !f.qty || !f.unit_price) return { id: r.id, _invalid: true }
+      return { id: r.id, door_bom_id: f.door_bom_id, color: f.color, qty: f.qty, unit_price: f.unit_price, handler_sale: c.handler_sale, order_date: c.order_date, lock_hole: c.lock_hole, style: c.style, board: c.board }
+    }
+    return { id: r.id, door_bom_id: c.door_bom_id, color: c.color, qty: c.qty, unit_price: c.unit_price, handler_sale: c.handler_sale, order_date: c.order_date, lock_hole: c.lock_hole, style: c.style, board: c.board }
+  })
+  const invalid = items.filter(x => x._invalid).length
+  if (invalid > 0) { ElMessage.warning('有 ' + invalid + ' 条覆盖行字段未填全（门型/颜色/数量/单价），请补全或取消覆盖'); return }
+  batching.value = true
+  try {
+    const { data } = await measureApi.batchConvert({ items })
+    ElMessage.success(`批量转单完成：成功 ${data.success} 条` + (data.skipped ? `，跳过 ${data.skipped} 条` : ''))
+    if (data.skipped > 0) {
+      const skippedRows = data.results.filter(r => r.skipped)
+      ElMessage.info('跳过明细：' + skippedRows.map(r => `#${r.id}(${r.reason})`).join('、'))
+    }
+    batchDlg.value = false
+    load()
+  } catch (e) { ElMessage.error(e.message || '批量转单失败') }
+  finally { batching.value = false }
 }
 // 单条快捷转单：复用现有 measureApi.convert（简易表单，门型下拉 mirror orders.vue）
 const convDlg = ref(false), convRow = ref(null), converting = ref(false)
@@ -171,4 +255,7 @@ const doConvert = async () => {
 .photo-empty{color:var(--el-color-info)}
 .photo-grid{display:flex;flex-wrap:wrap;gap:8px}
 .photo-item{width:96px;height:96px;border-radius:4px;border:1px solid var(--el-border-color)}
+.batch-common{background:var(--el-fill-color-light);padding:12px;border-radius:6px;margin-bottom:12px}
+.batch-common-title{font-weight:600;margin-bottom:8px}
+.batch-rows-title{font-weight:600;margin:8px 0}
 </style>
