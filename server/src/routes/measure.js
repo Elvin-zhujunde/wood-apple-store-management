@@ -213,8 +213,8 @@ router.post(
   wrap(async (req, res) => {
     const { door_bom_id, color, qty, unit_price, handler_sale, order_date,
             lock_hole, style, board } = req.body;
-    if (!door_bom_id || !color || !qty || !unit_price || !handler_sale || !order_date)
-      return fail(res, '门型/颜色/数量/单价/经手人/下单日期 必填');
+    if (!door_bom_id || !color || !qty || (unit_price === null || unit_price === undefined || unit_price === '') || !handler_sale || !order_date)
+      return fail(res, '门型/颜色/单价/经手人/下单日期 必填');
 
     const conn = await pool.getConnection();
     try {
@@ -287,8 +287,8 @@ router.post(
       for (const item of items) {
         const { id, door_bom_id, color, qty, unit_price, handler_sale, order_date,
                 lock_hole, style, board } = item;
-        // 6 必填校验，缺则跳过
-        if (!id || !door_bom_id || !color || !qty || !unit_price || !handler_sale || !order_date) {
+        // 6 必填校验，缺则跳过（单价允许为0：送门业务）
+        if (!id || !door_bom_id || !color || !qty || (unit_price === null || unit_price === undefined || unit_price === '') || !handler_sale || !order_date) {
           skipped++; results.push({ id, skipped: true, reason: '字段缺失' }); continue;
         }
         const [ms] = await conn.query(
