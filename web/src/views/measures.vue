@@ -75,7 +75,7 @@
     </el-drawer>
 
     <!-- 单条快捷转单弹窗（复用 measureApi.convert；批量转单弹窗 Task 3 做） -->
-    <el-dialog v-model="convDlg" title="测量转单" width="560px">
+    <el-dialog v-model="convDlg" title="测量转单" width="640px">
       <el-descriptions v-if="convRow" :column="2" border size="small" style="margin-bottom:12px">
         <el-descriptions-item label="客户">{{ convRow.customer_name }}</el-descriptions-item>
         <el-descriptions-item label="定位">{{ convRow.location_name }}</el-descriptions-item>
@@ -86,8 +86,7 @@
       </el-descriptions>
       <el-form :model="convForm" label-width="80px">
         <el-form-item label="门型"><el-select v-model="convForm.door_bom_id" filterable @change="onConvBomChange" style="width:100%"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select></el-form-item>
-        <el-form-item label="颜色"><el-input v-model="convForm.color" /></el-form-item>
-        <el-form-item label="数量"><el-input-number v-model="convForm.qty" :min="1" /></el-form-item>
+        <el-form-item label="颜色"><el-select v-model="convForm.color" filterable allow-create style="width:100%"><el-option v-for="c in convColors" :key="c" :label="c" :value="c" /></el-select></el-form-item>
         <el-form-item label="单价"><el-input-number v-model="convForm.unit_price" :min="0" :precision="2" /></el-form-item>
         <el-form-item label="经手人"><el-input v-model="convForm.handler_sale" /></el-form-item>
         <el-form-item label="下单日期"><el-date-picker v-model="convForm.order_date" type="date" value-format="YYYY-MM-DD" /></el-form-item>
@@ -102,15 +101,14 @@
     </el-dialog>
 
     <!-- 批量转单弹窗（统一字段 + 逐条覆盖） -->
-    <el-dialog v-model="batchDlg" title="批量转单" width="860px" :close-on-click-modal="false">
+    <el-dialog v-model="batchDlg" title="批量转单" width="1080px" :close-on-click-modal="false">
       <div class="batch-common">
         <div class="batch-common-title">统一设置（未勾选「覆盖」的行用此值）</div>
         <el-form :model="batchCommon" label-width="80px" size="small">
           <el-form-item label="门型"><el-select v-model="batchCommon.door_bom_id" filterable @change="onBatchBomChange" style="width:100%"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select></el-form-item>
           <div style="display:flex;gap:12px">
-            <el-form-item label="颜色" style="flex:1"><el-input v-model="batchCommon.color" /></el-form-item>
-            <el-form-item label="数量" style="width:120px"><el-input-number v-model="batchCommon.qty" :min="1" /></el-form-item>
-            <el-form-item label="单价" style="width:140px"><el-input-number v-model="batchCommon.unit_price" :min="0" :precision="2" /></el-form-item>
+            <el-form-item label="颜色" style="flex:1"><el-select v-model="batchCommon.color" filterable allow-create style="width:100%"><el-option v-for="c in batchColors" :key="c" :label="c" :value="c" /></el-select></el-form-item>
+            <el-form-item label="单价" style="width:160px"><el-input-number v-model="batchCommon.unit_price" :min="0" :precision="2" /></el-form-item>
           </div>
           <div style="display:flex;gap:12px">
             <el-form-item label="经手人" style="flex:1"><el-input v-model="batchCommon.handler_sale" /></el-form-item>
@@ -134,10 +132,9 @@
         <el-table-column label="覆盖字段（勾选「覆盖」后可编辑）" min-width="320">
           <template #default="{row}">
             <div v-if="row.override" style="display:flex;gap:6px;flex-wrap:wrap">
-              <el-select v-model="row.form.door_bom_id" filterable placeholder="门型" style="width:140px"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select>
-              <el-input v-model="row.form.color" placeholder="颜色" style="width:90px" />
-              <el-input-number v-model="row.form.qty" :min="1" placeholder="数量" style="width:90px" />
-              <el-input-number v-model="row.form.unit_price" :min="0" :precision="2" placeholder="单价" style="width:110px" />
+              <el-select v-model="row.form.door_bom_id" filterable placeholder="门型" style="width:150px" @change="onRowBomChange(row)"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select>
+              <el-select v-model="row.form.color" filterable allow-create placeholder="颜色" style="width:110px"><el-option v-for="c in rowColors(row)" :key="c" :label="c" :value="c" /></el-select>
+              <el-input-number v-model="row.form.unit_price" :min="0" :precision="2" placeholder="单价" style="width:120px" />
             </div>
             <span v-else style="color:var(--el-color-info)">用统一值</span>
           </template>
@@ -151,7 +148,7 @@
   </div>
 </template>
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { measureApi, bomApi } from '../api/index'
@@ -191,23 +188,23 @@ const onBatchConvert = async () => {
   batchRows.value = selection.value.map(r => ({ id: r.id, customer_name: r.customer_name, location_name: r.location_name, door_h: r.door_h, door_w: r.door_w, wall_thick: r.wall_thick, override: false, form: { door_bom_id: null, color: '', qty: 1, unit_price: 0 } }))
   batchDlg.value = true
 }
-const onBatchBomChange = (id) => { const b = bomList.value.find((x) => x.id === id); if (b) batchCommon.value.color = b.colors?.split(',')[0] || '' }
+const onBatchBomChange = (id) => { batchCommon.value.color = colorsOf(id)[0] || '' }
 const doBatchConvert = async () => {
   const c = batchCommon.value
-  if (!c.door_bom_id || !c.color || !c.qty || !c.unit_price || !c.handler_sale || !c.order_date) {
-    ElMessage.warning('统一设置：门型/颜色/数量/单价/经手人/下单日期 必填'); return
+  if (!c.door_bom_id || !c.color || !c.unit_price || !c.handler_sale || !c.order_date) {
+    ElMessage.warning('统一设置：门型/颜色/单价/经手人/下单日期 必填'); return
   }
   // 构造 items：覆盖行用 row.form（4 字段）+ 统一（其余 5 字段）；非覆盖行全用统一
   const items = batchRows.value.map(r => {
     if (r.override) {
       const f = r.form
-      if (!f.door_bom_id || !f.color || !f.qty || !f.unit_price) return { id: r.id, _invalid: true }
+      if (!f.door_bom_id || !f.color || !f.unit_price) return { id: r.id, _invalid: true }
       return { id: r.id, door_bom_id: f.door_bom_id, color: f.color, qty: f.qty, unit_price: f.unit_price, handler_sale: c.handler_sale, order_date: c.order_date, lock_hole: c.lock_hole, style: c.style, board: c.board }
     }
     return { id: r.id, door_bom_id: c.door_bom_id, color: c.color, qty: c.qty, unit_price: c.unit_price, handler_sale: c.handler_sale, order_date: c.order_date, lock_hole: c.lock_hole, style: c.style, board: c.board }
   })
   const invalid = items.filter(x => x._invalid).length
-  if (invalid > 0) { ElMessage.warning('有 ' + invalid + ' 条覆盖行字段未填全（门型/颜色/数量/单价），请补全或取消覆盖'); return }
+  if (invalid > 0) { ElMessage.warning('有 ' + invalid + ' 条覆盖行字段未填全（门型/颜色/单价），请补全或取消覆盖'); return }
   batching.value = true
   try {
     const { data } = await measureApi.batchConvert({ items })
@@ -231,11 +228,16 @@ const onQuickConvert = async (row) => {
   convForm.value = { door_bom_id: null, color: '', qty: 1, unit_price: 0, handler_sale: store.name, order_date: new Date().toISOString().slice(0, 10), lock_hole: '', style: '', board: '' }
   convDlg.value = true
 }
-const onConvBomChange = (id) => { const b = bomList.value.find((x) => x.id === id); if (b) convForm.value.color = b.colors?.split(',')[0] || '' }
+const colorsOf = (id) => { const b = bomList.value.find((x) => x.id === id); return (b && b.colors) ? b.colors.split(',').map(s => s.trim()).filter(Boolean) : [] }
+const convColors = computed(() => colorsOf(convForm.value.door_bom_id))
+const batchColors = computed(() => colorsOf(batchCommon.value.door_bom_id))
+const rowColors = (row) => colorsOf(row.form.door_bom_id)
+const onRowBomChange = (row) => { row.form.color = colorsOf(row.form.door_bom_id)[0] || '' }
+const onConvBomChange = (id) => { convForm.value.color = colorsOf(id)[0] || '' }
 const doConvert = async () => {
   const f = convForm.value
-  if (!f.door_bom_id || !f.color || !f.qty || !f.unit_price || !f.handler_sale || !f.order_date) {
-    ElMessage.warning('门型/颜色/数量/单价/经手人/下单日期 必填'); return
+  if (!f.door_bom_id || !f.color || !f.unit_price || !f.handler_sale || !f.order_date) {
+    ElMessage.warning('门型/颜色/单价/经手人/下单日期 必填'); return
   }
   converting.value = true
   try {
