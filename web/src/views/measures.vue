@@ -104,18 +104,18 @@
     <el-dialog v-model="batchDlg" title="批量转单" width="1080px" :close-on-click-modal="false">
       <div class="batch-common">
         <div class="batch-common-title">统一设置（未勾选「覆盖」的行用此值）</div>
-        <el-form :model="batchCommon" label-width="80px" size="small">
-          <el-form-item label="门型"><el-select v-model="batchCommon.door_bom_id" filterable @change="onBatchBomChange" style="width:100%"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select></el-form-item>
-          <div style="display:flex;gap:12px">
+        <el-form :model="batchCommon" label-width="76px">
+          <div style="display:flex;gap:16px">
+            <el-form-item label="门型" style="flex:2"><el-select v-model="batchCommon.door_bom_id" filterable @change="onBatchBomChange" style="width:100%"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select></el-form-item>
             <el-form-item label="颜色" style="flex:1"><el-select v-model="batchCommon.color" filterable allow-create style="width:100%"><el-option v-for="c in batchColors" :key="c" :label="c" :value="c" /></el-select></el-form-item>
-            <el-form-item label="单价" style="width:160px"><el-input-number v-model="batchCommon.unit_price" :min="0" :precision="2" /></el-form-item>
+            <el-form-item label="单价" style="flex:1"><el-input-number v-model="batchCommon.unit_price" :min="0" :precision="2" style="width:100%" /></el-form-item>
           </div>
-          <div style="display:flex;gap:12px">
+          <div style="display:flex;gap:16px">
             <el-form-item label="经手人" style="flex:1"><el-input v-model="batchCommon.handler_sale" /></el-form-item>
-            <el-form-item label="下单日期" style="width:180px"><el-date-picker v-model="batchCommon.order_date" type="date" value-format="YYYY-MM-DD" /></el-form-item>
-          </div>
-          <div style="display:flex;gap:12px">
+            <el-form-item label="下单日期" style="flex:1"><el-date-picker v-model="batchCommon.order_date" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
             <el-form-item label="锁孔" style="flex:1"><el-input v-model="batchCommon.lock_hole" /></el-form-item>
+          </div>
+          <div style="display:flex;gap:16px">
             <el-form-item label="款式" style="flex:1"><el-input v-model="batchCommon.style" /></el-form-item>
             <el-form-item label="板材" style="flex:1"><el-input v-model="batchCommon.board" /></el-form-item>
           </div>
@@ -123,18 +123,20 @@
       </div>
       <div class="batch-rows-title">待转单记录 ({{ batchRows.length }})</div>
       <el-table :data="batchRows" border size="small" max-height="300">
-        <el-table-column prop="customer_name" label="客户" min-width="100" />
-        <el-table-column prop="location_name" label="定位" min-width="100" />
-        <el-table-column label="尺寸" width="140"><template #default="{row}">{{ row.door_h }}×{{ row.door_w }} 墙{{ row.wall_thick }}</template></el-table-column>
-        <el-table-column label="覆盖" width="70">
+        <el-table-column prop="customer_name" label="客户" min-width="110" />
+        <el-table-column prop="location_name" label="定位" min-width="110" />
+        <el-table-column label="尺寸" width="150"><template #default="{row}">{{ row.door_h }}×{{ row.door_w }} 墙{{ row.wall_thick }}</template></el-table-column>
+        <el-table-column label="覆盖" width="64">
           <template #default="{row}"><el-checkbox v-model="row.override" /></template>
         </el-table-column>
-        <el-table-column label="覆盖字段（勾选「覆盖」后可编辑）" min-width="320">
+        <el-table-column label="覆盖字段（勾选「覆盖」后可编辑）" min-width="520">
           <template #default="{row}">
-            <div v-if="row.override" style="display:flex;gap:6px;flex-wrap:wrap">
-              <el-select v-model="row.form.door_bom_id" filterable placeholder="门型" style="width:150px" @change="onRowBomChange(row)"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select>
-              <el-select v-model="row.form.color" filterable allow-create placeholder="颜色" style="width:110px"><el-option v-for="c in rowColors(row)" :key="c" :label="c" :value="c" /></el-select>
-              <el-input-number v-model="row.form.unit_price" :min="0" :precision="2" placeholder="单价" style="width:120px" />
+            <div v-if="row.override" class="row-override-form">
+              <el-select v-model="row.form.door_bom_id" filterable placeholder="门型" style="width:100%" @change="onRowBomChange(row)"><el-option v-for="b in bomList" :key="b.id" :label="b.name" :value="b.id" /></el-select>
+              <div style="display:flex;gap:8px">
+                <el-select v-model="row.form.color" filterable allow-create placeholder="颜色" style="flex:1"><el-option v-for="c in rowColors(row)" :key="c" :label="c" :value="c" /></el-select>
+                <el-input-number v-model="row.form.unit_price" :min="0" :precision="2" placeholder="单价" style="flex:1" />
+              </div>
             </div>
             <span v-else style="color:var(--el-color-info)">用统一值</span>
           </template>
@@ -262,4 +264,6 @@ const doConvert = async () => {
 .batch-common{background:var(--el-fill-color-light);padding:12px;border-radius:6px;margin-bottom:12px}
 .batch-common-title{font-weight:600;margin-bottom:8px}
 .batch-rows-title{font-weight:600;margin:8px 0}
+.row-override-form{display:flex;flex-direction:column;gap:6px;padding:4px 0}
+.row-override-form :deep(.el-input__inner),.row-override-form :deep(.el-input-number){width:100%}
 </style>
