@@ -114,6 +114,8 @@ export const measureApi = {
   update: (id, data) => request.put('/measure/' + id, data),
   remove: (id) => request.delete('/measure/' + id),
   convert: (id, data) => request.post('/measure/' + id + '/convert', data),
+  all: (params) => request.get('/measure/all', { params }),
+  batchConvert: (data) => request.post('/measure/batch-convert', data),
 }
 
 // 用户管理

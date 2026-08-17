@@ -30,6 +30,7 @@ const routes = [
       { path: 'door-bom', name: 'door-bom', component: () => import('../views/doorBom.vue'), meta: { title: '门型BOM' } },
       { path: 'customers', name: 'customers', component: () => import('../views/customers.vue'), meta: { title: '客户档案' } },
       { path: 'users', name: 'users', component: () => import('../views/users.vue'), meta: { title: '用户管理' } },
+      { path: 'measures', name: 'measures', component: () => import('../views/measures.vue'), meta: { title: '测量记录' } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
