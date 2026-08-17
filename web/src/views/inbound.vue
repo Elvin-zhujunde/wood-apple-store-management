@@ -54,7 +54,7 @@
     />
 
     <!-- 新增 -->
-    <el-dialog v-model="addVisible" title="采购入库单" width="640px" :close-on-click-modal="false">
+    <el-dialog v-model="addVisible" title="采购入库单" width="860px" :close-on-click-modal="false" top="6vh">
       <el-form :model="form" label-width="100px">
         <el-row :gutter="12">
           <el-col :span="12"><el-form-item label="物料" required>
