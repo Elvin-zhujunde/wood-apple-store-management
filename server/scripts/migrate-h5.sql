@@ -3,33 +3,44 @@
 -- 适用：已运行旧 schema（users.role = sale/stock/finance）的生产/测试库
 -- 全新库无需本脚本，直接跑 server/src/db/init.sql 即可
 --
--- 执行顺序严格不可逆：
---   1. 存量账号先迁 boss（必须先于 ALTER，否则删枚举值致存量行失效）
---   2. 改枚举为 boss/worker
---   3. 建 3 张新表（IF NOT EXISTS，安全可重复执行）
+-- 执行顺序严格不可逆（2026-08-17 修正：原顺序有 bug）
+--   1. 先 ALTER 把枚举扩成 5 值（旧 sale/stock/finance 保留 + 新增 boss/worker）
+--      —— 关键：旧枚举只有 sale/stock/finance，不含 boss。若先 UPDATE role='boss'
+--         会因 'boss' 不在枚举内被 MySQL 截断报 "Data truncated" 致整个脚本中断。
+--         故必须先 ALTER 扩枚举（保留旧值不丢存量行），再 UPDATE。
+--   2. UPDATE 存量账号 sale/stock/finance → boss（此时枚举已含 boss，合法）
+--   3. ALTER 枚举收窄为 boss/worker（存量已全 boss，无截断风险）
+--   4. 建 3 张新表（IF NOT EXISTS，安全可重复执行）
 --
 -- 执行方式（任选其一）：
 --   mysql -u root -p wood_store < server/scripts/migrate-h5.sql
 --   或在 MySQL 客户端中 SOURCE 该文件
+--   （无 mysql 客户端时可用 server/_run-migrate-h5.cjs 经 mysql2 执行，跑完即删）
 -- ============================================================
 
 USE wood_store;
 
 -- ------------------------------------------------------------
--- 1. 存量账号迁移：旧三角色统一归为 boss（老板/超管）
---    必须先于 ALTER TABLE 执行，否则 ALTER 删除旧枚举值时
---    存量行 role 值会变为 '' 触发 NOT NULL 失效
+-- 1. 先 ALTER 扩枚举为 5 值过渡态（保留旧值 + 加 boss/worker）
+--    必须先于 UPDATE，否则 'boss' 不在旧枚举内触发 Data truncated
+-- ------------------------------------------------------------
+ALTER TABLE users
+  MODIFY role ENUM('sale','stock','finance','boss','worker') NOT NULL COMMENT '角色(迁移过渡态)';
+
+-- ------------------------------------------------------------
+-- 2. 存量账号迁移：旧三角色统一归为 boss（老板/超管）
+--    此时枚举已含 boss，UPDATE 合法
 -- ------------------------------------------------------------
 UPDATE users SET role = 'boss' WHERE role IN ('sale', 'stock', 'finance');
 
 -- ------------------------------------------------------------
--- 2. 重构 users.role 枚举为 boss/worker
+-- 3. 收窄枚举为 boss/worker（存量已全 boss，删旧值无风险）
 -- ------------------------------------------------------------
 ALTER TABLE users
   MODIFY role ENUM('boss', 'worker') NOT NULL COMMENT '老板(超管)/工人(仅量尺)';
 
 -- ------------------------------------------------------------
--- 3. 追加 H5 子系统 3 张新表（与 init.sql 末尾一致，IF NOT EXISTS 安全）
+-- 4. 追加 H5 子系统 3 张新表（与 init.sql 末尾一致，IF NOT EXISTS 安全）
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS customers (
   id            INT AUTO_INCREMENT PRIMARY KEY,
