@@ -126,3 +126,9 @@ export const userApi = {
   resetPassword: (id, new_password) => request.put('/users/' + id + '/password', { new_password }),
   remove: (id) => request.delete('/users/' + id),
 }
+
+// 操作日志（boss only，仅注册路由不显示侧栏）
+export const logApi = {
+  list: (params) => request.get('/operation-logs', { params }),
+  modules: () => request.get('/operation-logs/modules'),
+}

@@ -243,3 +243,24 @@ CREATE TABLE IF NOT EXISTS measure_records (
   CONSTRAINT fk_meas_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
   CONSTRAINT fk_meas_location FOREIGN KEY (location_id) REFERENCES customer_locations(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='现场测量记录';
+
+-- ============================================================
+-- 14. 操作日志（全局中间件自动记录写操作）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS operation_logs (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NULL COMMENT '操作人id(req.user.id, 未登录NULL)',
+  user_name   VARCHAR(50) NULL COMMENT '操作人姓名(req.user.name)',
+  method      VARCHAR(10) NOT NULL COMMENT 'POST/PUT/DELETE',
+  path        VARCHAR(200) NOT NULL COMMENT '请求路径 /api/xxx/123',
+  module      VARCHAR(50) NULL COMMENT '业务模块(按path前缀映射:销售订单/采购入库...)',
+  action      VARCHAR(20) NULL COMMENT '动作(创建/更新/删除)',
+  target_id   INT NULL COMMENT '路径中的:id(能取则取)',
+  status      VARCHAR(10) NULL COMMENT '成功(2xx)/失败(其他)',
+  ip          VARCHAR(45) NULL COMMENT '请求IP',
+  detail      VARCHAR(500) NULL COMMENT '关键摘要(订单号/客户名等,不存全body)',
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_log_user (user_id),
+  INDEX idx_log_created (created_at),
+  INDEX idx_log_module (module)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志';

@@ -31,6 +31,8 @@ const routes = [
       { path: 'customers', name: 'customers', component: () => import('../views/customers.vue'), meta: { title: '客户档案' } },
       { path: 'users', name: 'users', component: () => import('../views/users.vue'), meta: { title: '用户管理' } },
       { path: 'measures', name: 'measures', component: () => import('../views/measures.vue'), meta: { title: '测量记录' } },
+      // 操作日志：仅注册路由，不进 menu.js（侧栏不显示），boss 直接输 URL 访问
+      { path: 'operation-logs', name: 'operation-logs', component: () => import('../views/operationLogs.vue'), meta: { title: '操作日志' } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
