@@ -17,21 +17,9 @@
     <div v-else-if="!list.length" class="state-tip no-print">未找到下料单数据（可能未选择或已删除）。</div>
 
     <template v-if="list.length">
-      <!-- 单张模式：一单一表（表头 + 1 行 + 表底汇总） -->
-      <section v-if="mode === 'single'" v-for="row in list" :key="row.id" class="cut-sheet single">
-        <div class="sheet-title">下料单 · 订单号 {{ row.order_no }} · {{ row.customer }}</div>
-        <table class="cut-table">
-          <thead v-html="headHtml"></thead>
-          <tbody>
-            <tr v-html="rowHtml(row)"></tr>
-          </tbody>
-        </table>
-        <div class="sheet-foot">下料日：{{ fmtDate(row.cut_date) }}　经手人：{{ row.handler || '-' }}　模式：{{ row.mode === 2 ? '特殊（手填）' : '普通（自动扣尺）' }}</div>
-      </section>
-
-      <!-- 批量模式：合并一张表（表头 + N 行 + 表底汇总） -->
-      <section v-else class="cut-sheet ledger">
-        <div class="sheet-title">下料单台账 · 共 {{ list.length }} 条</div>
+      <!-- 单张/批量统一合并一张连续表（表头一次 + N 行），page-break 自动分页一页多单省纸 -->
+      <section class="cut-sheet ledger">
+        <div class="sheet-title">{{ mode === 'single' ? '下料单' : '下料单台账' }} · 共 {{ list.length }} 条</div>
         <table class="cut-table">
           <thead v-html="headHtml"></thead>
           <tbody>
@@ -170,28 +158,29 @@ onMounted(async () => {
 .print-toolbar .toolbar-right { display:flex; align-items:center; gap:8px; }
 .state-tip { max-width:210mm; margin:40px auto; text-align:center; color:#909399; }
 
-/* 表格：A4 一页一单（单张）/ 连续表（批量） */
-.cut-sheet { width:210mm; margin:0 auto 16px; background:#fff; padding:12mm 10mm; box-sizing:border-box; box-shadow:0 1px 6px rgba(0,0,0,.12); }
-.cut-sheet.single { min-height:287mm; display:flex; flex-direction:column; }
-.sheet-title { font-size:16px; font-weight:700; letter-spacing:2px; margin-bottom:10px; border-bottom:2px solid #000; padding-bottom:6px; }
+/* 表格：连续紧凑排版，page-break 自动分页（一页多单/多行，省纸） */
+.cut-sheet { width:210mm; margin:0 auto 12px; background:#fff; padding:8mm 8mm; box-sizing:border-box; box-shadow:0 1px 6px rgba(0,0,0,.12); }
+.cut-sheet.single { min-height:auto; }
+.sheet-title { font-size:14px; font-weight:700; letter-spacing:1px; margin-bottom:6px; border-bottom:2px solid #000; padding-bottom:4px; }
 
 /* 纯黑白表格：黑边框、表头浅灰底、门扇高/宽加粗（无彩色） */
-.cut-table { width:100%; border-collapse:collapse; font-size:13px; color:#000; }
-.cut-table th, .cut-table td { border:1px solid #000; padding:6px 5px; text-align:center; vertical-align:middle; }
+.cut-table { width:100%; border-collapse:collapse; font-size:12px; color:#000; }
+.cut-table th, .cut-table td { border:1px solid #000; padding:3px 4px; text-align:center; vertical-align:middle; line-height:1.3; }
 .cut-table th { background:#eee; font-weight:600; }
-.cut-table td.door { font-size:14px; }
+.cut-table td.door { font-size:13px; }
 
 /* 表底小字汇总行 */
-.sheet-foot { margin-top:10px; padding-top:8px; border-top:1px solid #999; font-size:12px; color:#333; }
+.sheet-foot { margin-top:6px; padding-top:4px; border-top:1px solid #999; font-size:11px; color:#333; }
 
 @media print {
   .no-print { display:none !important; }
   .print-root { background:#fff; padding:0; }
   /* @page 由 JS 动态注入（A4 横/纵向可选），见 applyPageStyle */
-  .cut-sheet { width:auto; min-height:auto; margin:0; padding:0; box-shadow:none; page-break-after:always; }
-  .cut-sheet:last-child { page-break-after:auto; }
-  .cut-table { font-size:12px; }
+  .cut-sheet { width:auto; min-height:auto; margin:0 0 4mm; padding:0; box-shadow:none; }
+  .cut-sheet:last-child { margin-bottom:0; }
+  .cut-table { font-size:11px; }
   .cut-table thead { display:table-header-group; } /* 表头每页重复 */
   .cut-table tr { page-break-inside:avoid; }        /* 行不跨页 */
+  .cut-sheet.single { page-break-inside:avoid; }    /* 单张：一单不被截断（整单紧凑不跨页） */
 }
 </style>
