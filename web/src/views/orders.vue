@@ -1295,7 +1295,9 @@ function openLabel(row) {
 }
 function printLabel() {
   if (!labelType.value || !labelRow.value) return
-  router.push({ path: '/label/print', query: { type: labelType.value, ids: labelRow.value.id } })
+  // window.open 新开标签页：不导航本页，保留选中状态/筛选条件（与下料单打印一致）
+  const { href } = router.resolve({ path: '/label/print', query: { type: labelType.value, ids: labelRow.value.id } })
+  window.open(href, '_blank')
   labelVisible.value = false
 }
 // 批量标签：工具栏入口（选多单同类型打印）
@@ -1308,7 +1310,9 @@ function openBatchLabel() {
 function printBatchLabel() {
   if (!labelType.value) return ElMessage.warning('请选标签类型')
   const ids = selectedRows.value.map((r) => r.id).join(',')
-  router.push({ path: '/label/print', query: { type: labelType.value, ids } })
+  // window.open 新开标签页：保留选中状态/筛选条件（与下料单打印一致）
+  const { href } = router.resolve({ path: '/label/print', query: { type: labelType.value, ids } })
+  window.open(href, '_blank')
   labelVisible.value = false
 }
 
