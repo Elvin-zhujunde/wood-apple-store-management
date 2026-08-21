@@ -28,104 +28,58 @@
       <el-button type="success" :disabled="selectedRows.length === 0" @click="openBatchLabel">标签打印 ({{ selectedRows.length }})</el-button>
       <el-button type="primary" :disabled="batchCuttableCount === 0" @click="openBatchCut">批量下料 ({{ batchCuttableCount }})</el-button>
       <el-button type="info" :disabled="selectedRows.length < 2" @click="openBatchReq">批量领料 ({{ selectedRows.length }})</el-button>
-      <ColumnSettings :columns="allColumns" storage-key="orders-cols" @change="(v) => (visibleCols = v)" />
+      <ColumnSettings :columns="allColumns" storage-key="orders-cols" @change="onColsChange" />
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
       <el-table-column type="selection" width="42" />
-      <el-table-column v-if="colVisible('order_no')" prop="order_no" label="订单号" width="160" />
-      <el-table-column v-if="colVisible('customer')" prop="customer" label="客户" min-width="120" />
-      <el-table-column v-if="colVisible('size')" label="尺寸(高×宽)" width="150">
+      <el-table-column
+        v-for="col in orderedVisibleCols"
+        :key="col.prop"
+        :prop="col.prop"
+        :label="col.label"
+        :width="col.width"
+        :min-width="col.minWidth"
+        :align="col.align || 'left'"
+      >
         <template #default="{ row }">
-          <span v-if="row.door_h || row.door_w">{{ row.door_h || '-' }}×{{ row.door_w || '-' }}</span>
-          <span v-else class="muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('wall_thick')" prop="wall_thick" label="墙厚" width="90" align="center">
-        <template #default="{ row }">{{ row.wall_thick != null ? row.wall_thick : '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('cut_door')" label="门扇(高×宽)" width="150">
-        <template #default="{ row }">
-          <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ row.cut_door_height }}×{{ row.cut_door_width }}</span>
-          <span v-else class="muted">未下料</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('cut_status')" label="下料状态" width="90">
-        <template #default="{ row }">
-          <el-tag v-if="row.cut_status" :type="cutStatusType(row.cut_status)" size="small">{{ row.cut_status }}</el-tag>
-          <span v-else class="muted">未下料</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('cut_date')" prop="cut_date" label="下料日" width="110" :formatter="dateFmt" />
-      <el-table-column v-if="colVisible('cut_remark_tags')" label="加工备注" min-width="120">
-        <template #default="{ row }">
-          <span v-if="parseTags(row.cut_remark_tags).length" class="tag-row">
-            <el-tag v-for="(t, i) in parseTags(row.cut_remark_tags)" :key="i" size="small" :type="tagType(t)" class="tag-item">{{ t }}</el-tag>
-          </span>
-          <span v-else class="muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('sub_customer')" prop="sub_customer" label="子客户" min-width="140">
-        <template #default="{ row }">{{ row.sub_customer || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('lock_hole')" prop="lock_hole" label="锁孔" width="100" align="center">
-        <template #default="{ row }">{{ row.lock_hole || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('door_bom_name')" prop="door_bom_name" label="门型" width="120" />
-      <el-table-column v-if="colVisible('color')" prop="color" label="颜色" width="80" />
-      <el-table-column v-if="colVisible('style')" prop="style" label="款式" width="100">
-        <template #default="{ row }">{{ row.style || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('board')" prop="board" label="门扇板材" width="90" align="center">
-        <template #default="{ row }">{{ row.board || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('total_amount')" label="应收" width="90" align="right" prop="total_amount" />
-      <el-table-column v-if="colVisible('paid_amount')" label="已收" width="90" align="right">
-        <template #default="{ row }">{{ row.paid_amount != null ? row.paid_amount : '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('balance')" label="欠款" width="90" align="right">
-        <template #default="{ row }">
-          <span v-if="balanceOf(row) > 0" style="color:#f56c6c;font-weight:600">{{ balanceOf(row) }}</span>
-          <span v-else-if="row.paid_amount != null" style="color:#67c23a">0</span>
-          <span v-else class="muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('customer_type')" prop="customer_type" label="客户类别" width="90" align="center">
-        <template #default="{ row }">{{ row.customer_type || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('pay_method')" prop="pay_method" label="付款方式" width="90" align="center">
-        <template #default="{ row }">{{ row.pay_method || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('handler_sale')" prop="handler_sale" label="经手人" width="80" />
-      <el-table-column v-if="colVisible('salesperson')" prop="salesperson" label="业务员" width="80">
-        <template #default="{ row }">{{ row.salesperson || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('installer')" prop="installer" label="安装师傅" width="90">
-        <template #default="{ row }">{{ row.installer || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('order_date')" prop="order_date" label="下单日" width="120" :formatter="dateFmt" />
-      <el-table-column v-if="colVisible('actual_ship_date')" prop="actual_ship_date" label="发货日" width="120" :formatter="dateFmt" />
-      <el-table-column v-if="colVisible('ship_no')" prop="ship_no" label="发货单号" width="130">
-        <template #default="{ row }">{{ row.ship_no || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('pay_date')" prop="pay_date" label="收款日" width="120" :formatter="dateFmt" />
-      <el-table-column v-if="colVisible('receipt_no')" prop="receipt_no" label="收据号" width="120">
-        <template #default="{ row }">{{ row.receipt_no || '-' }}</template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('remark')" prop="remark" label="订单备注" min-width="140">
-        <template #default="{ row }">
-          <span v-if="row.remark">{{ row.remark }}</span>
-          <span v-else class="muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('status')" label="状态" width="90">
-        <template #default="{ row }">
-          <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="colVisible('aging')" label="账龄" width="80" align="center">
-        <template #default="{ row }">
-          <span v-if="agingOf(row) != null" :style="agingStyle(agingOf(row))">{{ agingOf(row) }}天</span>
-          <span v-else class="muted">-</span>
+          <template v-if="col.prop === 'size'">
+            <span v-if="row.door_h || row.door_w">{{ row.door_h || '-' }}×{{ row.door_w || '-' }}</span>
+            <span v-else class="muted">-</span>
+          </template>
+          <template v-else-if="col.prop === 'cut_door'">
+            <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ row.cut_door_height }}×{{ row.cut_door_width }}</span>
+            <span v-else class="muted">未下料</span>
+          </template>
+          <template v-else-if="col.prop === 'cut_status'">
+            <el-tag v-if="row.cut_status" :type="cutStatusType(row.cut_status)" size="small">{{ row.cut_status }}</el-tag>
+            <span v-else class="muted">未下料</span>
+          </template>
+          <template v-else-if="col.prop === 'cut_remark_tags'">
+            <span v-if="parseTags(row.cut_remark_tags).length" class="tag-row">
+              <el-tag v-for="(t, i) in parseTags(row.cut_remark_tags)" :key="i" size="small" :type="tagType(t)" class="tag-item">{{ t }}</el-tag>
+            </span>
+            <span v-else class="muted">-</span>
+          </template>
+          <template v-else-if="col.prop === 'balance'">
+            <span v-if="balanceOf(row) > 0" style="color:#f56c6c;font-weight:600">{{ balanceOf(row) }}</span>
+            <span v-else-if="row.paid_amount != null" style="color:#67c23a">0</span>
+            <span v-else class="muted">-</span>
+          </template>
+          <template v-else-if="col.prop === 'status'">
+            <el-tag :type="statusType(row.status)" size="small">{{ row.status }}</el-tag>
+          </template>
+          <template v-else-if="col.prop === 'aging'">
+            <span v-if="agingOf(row) != null" :style="agingStyle(agingOf(row))">{{ agingOf(row) }}天</span>
+            <span v-else class="muted">-</span>
+          </template>
+          <template v-else-if="col.date">
+            <span v-if="row[col.prop]">{{ fmtDate(row[col.prop]) }}</span>
+            <span v-else class="muted">-</span>
+          </template>
+          <template v-else>
+            <span v-if="row[col.prop] != null && row[col.prop] !== ''">{{ row[col.prop] }}</span>
+            <span v-else class="muted">-</span>
+          </template>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="330" fixed="right">
@@ -731,7 +685,7 @@
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi, customerApi } from '../api'
-import { dateFmt, todayLocal } from '../utils/date'
+import { fmtDate, todayLocal } from '../utils/date'
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
@@ -750,41 +704,51 @@ const bomList = ref([])
 const customerList = ref([]) // 客户档案下拉源(接单从档案选,allow-create 允许新客户)
 
 // 列配置器：全量列定义（现有列默认显示，新增可选列 defaultVisible:false 默认隐藏）
-// key 与 colVisible(key) 对应；操作列固定显示不进配置器
+// 列定义：prop/label/width/minWidth/align/date(日期列走 fmtDate)；操作列固定不进配置器
 const allColumns = [
-  { prop: 'order_no', label: '订单号' },
-  { prop: 'customer', label: '客户' },
-  { prop: 'size', label: '尺寸(高×宽)' },
-  { prop: 'wall_thick', label: '墙厚' },
-  { prop: 'cut_door', label: '门扇(高×宽)' },
-  { prop: 'cut_status', label: '下料状态' },
-  { prop: 'cut_date', label: '下料日' },
-  { prop: 'cut_remark_tags', label: '加工备注' },
-  { prop: 'sub_customer', label: '子客户', defaultVisible: false },
-  { prop: 'lock_hole', label: '锁孔', defaultVisible: false },
-  { prop: 'door_bom_name', label: '门型' },
-  { prop: 'color', label: '颜色' },
-  { prop: 'style', label: '款式', defaultVisible: false },
-  { prop: 'board', label: '门扇板材', defaultVisible: false },
-  { prop: 'total_amount', label: '应收' },
-  { prop: 'paid_amount', label: '已收' },
-  { prop: 'balance', label: '欠款' },
-  { prop: 'customer_type', label: '客户类别', defaultVisible: false },
-  { prop: 'pay_method', label: '付款方式', defaultVisible: false },
-  { prop: 'handler_sale', label: '经手人' },
-  { prop: 'salesperson', label: '业务员', defaultVisible: false },
-  { prop: 'installer', label: '安装师傅', defaultVisible: false },
-  { prop: 'order_date', label: '下单日' },
-  { prop: 'actual_ship_date', label: '发货日' },
-  { prop: 'ship_no', label: '发货单号', defaultVisible: false },
-  { prop: 'pay_date', label: '收款日' },
-  { prop: 'receipt_no', label: '收据号', defaultVisible: false },
-  { prop: 'remark', label: '订单备注', defaultVisible: false },
-  { prop: 'status', label: '状态' },
-  { prop: 'aging', label: '账龄' },
+  { prop: 'order_no', label: '订单号', width: 160 },
+  { prop: 'customer', label: '客户', minWidth: 120 },
+  { prop: 'size', label: '尺寸(高×宽)', width: 150 },
+  { prop: 'wall_thick', label: '墙厚', width: 90, align: 'center' },
+  { prop: 'cut_door', label: '门扇(高×宽)', width: 150 },
+  { prop: 'cut_status', label: '下料状态', width: 90 },
+  { prop: 'cut_date', label: '下料日', width: 110, date: true },
+  { prop: 'cut_remark_tags', label: '加工备注', minWidth: 120 },
+  { prop: 'sub_customer', label: '子客户', minWidth: 140, defaultVisible: false },
+  { prop: 'lock_hole', label: '锁孔', width: 100, align: 'center', defaultVisible: false },
+  { prop: 'door_bom_name', label: '门型', width: 120 },
+  { prop: 'color', label: '颜色', width: 80 },
+  { prop: 'style', label: '款式', width: 100, defaultVisible: false },
+  { prop: 'board', label: '门扇板材', width: 90, align: 'center', defaultVisible: false },
+  { prop: 'total_amount', label: '应收', width: 90, align: 'right' },
+  { prop: 'paid_amount', label: '已收', width: 90, align: 'right' },
+  { prop: 'balance', label: '欠款', width: 90, align: 'right' },
+  { prop: 'customer_type', label: '客户类别', width: 90, align: 'center', defaultVisible: false },
+  { prop: 'pay_method', label: '付款方式', width: 90, align: 'center', defaultVisible: false },
+  { prop: 'handler_sale', label: '经手人', width: 80 },
+  { prop: 'salesperson', label: '业务员', width: 80, defaultVisible: false },
+  { prop: 'installer', label: '安装师傅', width: 90, defaultVisible: false },
+  { prop: 'order_date', label: '下单日', width: 120, date: true },
+  { prop: 'actual_ship_date', label: '发货日', width: 120, date: true },
+  { prop: 'ship_no', label: '发货单号', width: 130, defaultVisible: false },
+  { prop: 'pay_date', label: '收款日', width: 120, date: true },
+  { prop: 'receipt_no', label: '收据号', width: 120, defaultVisible: false },
+  { prop: 'remark', label: '订单备注', minWidth: 140, defaultVisible: false },
+  { prop: 'status', label: '状态', width: 90 },
+  { prop: 'aging', label: '账龄', width: 80, align: 'center' },
 ]
+// 显示列 + 列顺序（顺序由列设置拖拽控制）；orderedVisibleCols 驱动 v-for 按序渲染可见列
 const visibleCols = ref(allColumns.filter((c) => c.defaultVisible !== false).map((c) => c.prop))
-function colVisible(key) { return visibleCols.value.includes(key) }
+const colOrder = ref(allColumns.map((c) => c.prop))
+const orderedVisibleCols = computed(() =>
+  colOrder.value
+    .map((p) => allColumns.find((c) => c.prop === p))
+    .filter((c) => c && visibleCols.value.includes(c.prop))
+)
+function onColsChange({ visible, order }) {
+  visibleCols.value = visible
+  colOrder.value = order
+}
 
 // 表格固定滚动高度：搜索条件固定不滚，只有表格表体内部滚动
 // 按窗口高度动态算（留出搜索区/分页/卡片边距约 280px），最小 300 保证小屏可用
@@ -1305,15 +1269,17 @@ async function confirmDelete() {
   }
 }
 
-// 打印：单条=单张表；批量=合并一张表（仅已下料可打印）
+// 打印：新开标签页（window.open 不导航本页，保留选中状态/筛选条件）；单条=单张表，批量=合并一张表（仅已下料可打印）
 function printSingle(row) {
-  router.push({ path: '/cutting-list/print', query: { mode: 'single', ids: row.id } })
+  const { href } = router.resolve({ path: '/cutting-list/print', query: { mode: 'single', ids: row.id } })
+  window.open(href, '_blank')
 }
 function openBatchPrint() {
   const cutRows = selectedRows.value.filter((r) => r.cut_status)
   if (cutRows.length === 0) return ElMessage.warning('选中订单均未下料，无可打印下料单')
   const ids = cutRows.map((r) => r.id).join(',')
-  router.push({ path: '/cutting-list/print', query: { mode: 'ledger', ids } })
+  const { href } = router.resolve({ path: '/cutting-list/print', query: { mode: 'ledger', ids } })
+  window.open(href, '_blank')
 }
 
 // 标签打印（4 种类型）：订单行"标签"按钮 → 选类型 → 跳 labelPrint 页

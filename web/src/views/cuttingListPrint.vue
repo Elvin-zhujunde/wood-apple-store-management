@@ -3,7 +3,11 @@
     <!-- 工具栏：仅屏幕预览，打印时隐藏 -->
     <div class="print-toolbar no-print">
       <span class="ttl">下料单打印 · {{ mode === 'single' ? '单张' : '批量' }} · 共 {{ list.length }} 条</span>
-      <div>
+      <div class="toolbar-right">
+        <el-radio-group v-model="orientation" size="small">
+          <el-radio-button value="portrait">A4 纵向</el-radio-button>
+          <el-radio-button value="landscape">A4 横向</el-radio-button>
+        </el-radio-group>
         <el-button @click="goBack">返回</el-button>
         <el-button type="primary" :disabled="!list.length" @click="doPrint">打印</el-button>
       </div>
@@ -41,7 +45,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { cuttingApi } from '../api'
 import { fmtDate } from '../utils/date'
@@ -125,7 +129,22 @@ function doPrint() {
   window.print()
 }
 
+// A4 横纵向：动态注入 @page（at-rule 不能挂类选择器，须全局单条注入；切换即生效，打印前选好）
+const orientation = ref('portrait')
+const PAGE_STYLE_ID = 'print-page-orient'
+function applyPageStyle() {
+  let el = document.getElementById(PAGE_STYLE_ID)
+  if (!el) { el = document.createElement('style'); el.id = PAGE_STYLE_ID; document.head.appendChild(el) }
+  el.textContent = `@page { size: A4 ${orientation.value}; margin: 10mm; }`
+}
+watch(orientation, applyPageStyle)
+onUnmounted(() => {
+  const el = document.getElementById(PAGE_STYLE_ID)
+  if (el) el.remove()
+})
+
 onMounted(async () => {
+  applyPageStyle()
   mode.value = route.query.mode === 'ledger' ? 'ledger' : 'single'
   const ids = route.query.ids
   if (!ids) {
@@ -147,6 +166,7 @@ onMounted(async () => {
 .print-root { background:#f5f5f5; min-height:100vh; padding:16px; }
 .print-toolbar { display:flex; justify-content:space-between; align-items:center; max-width:210mm; margin:0 auto 16px; background:#fff; padding:12px 16px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
 .print-toolbar .ttl { font-size:15px; font-weight:600; }
+.print-toolbar .toolbar-right { display:flex; align-items:center; gap:8px; }
 .state-tip { max-width:210mm; margin:40px auto; text-align:center; color:#909399; }
 
 /* 表格：A4 一页一单（单张）/ 连续表（批量） */
@@ -166,7 +186,7 @@ onMounted(async () => {
 @media print {
   .no-print { display:none !important; }
   .print-root { background:#fff; padding:0; }
-  @page { size:A4; margin:10mm; }
+  /* @page 由 JS 动态注入（A4 横/纵向可选），见 applyPageStyle */
   .cut-sheet { width:auto; min-height:auto; margin:0; padding:0; box-shadow:none; page-break-after:always; }
   .cut-sheet:last-child { page-break-after:auto; }
   .cut-table { font-size:12px; }
