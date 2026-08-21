@@ -1,0 +1,21 @@
+import{h as z,i as q,j as F,E as U,o as i,c as d,d as l,t as a,a as h,w as m,k as B,F as k,l as E,g,m as G,r as b,n as A,b as J,f as p,p as O}from"./index-9hM_oUMz.js";import{c as Y}from"./index-TUDwRm6J.js";import{f as K}from"./date-BKRYYSDJ.js";const Q={class:"print-root"},W={class:"print-toolbar no-print"},X={class:"ttl"},Z={class:"toolbar-right"},w={key:0,class:"state-tip no-print"},tt={key:1,class:"state-tip no-print"},et={class:"sheet-title"},nt={class:"cut-table"},st=["innerHTML"],lt={class:"sheet-foot"},ot={key:1,class:"cut-sheet ledger"},at={class:"sheet-title"},rt={class:"cut-table"},it=["innerHTML"],dt={class:"sheet-foot"},C=`
+  <tr>
+    <th>客户名称</th>
+    <th>订单号</th>
+    <th>门洞(mm)<br>高*宽*墙厚</th>
+    <th>款式</th>
+    <th>颜色</th>
+    <th>套板线条</th>
+    <th>备注</th>
+    <th>门扇(mm)<br>高*宽</th>
+    <th>板材</th>
+  </tr>`,$="print-page-orient",_t={__name:"cuttingListPrint",setup(ut){const T=G(),S=J(),f=g("single"),o=g([]),v=g(!0);function V(t){if(!t)return[];try{const e=JSON.parse(t);return Array.isArray(e)?e.filter(u=>typeof u=="string"&&u):[]}catch{return[]}}function c(t){return t!=null&&t!==""?Math.round(Number(t)):null}function H(t){const e=V(t.remark_tags),u=e.length?" "+e.map(n=>"【"+n+"】").join(""):"",y=(t.remark||"")+u,r=n=>`<td>${n!=null&&n!==""?n:"-"}</td>`,s=t.wall_thick!=null?t.wall_thick:t.wall_thickness!=null?t.wall_thickness:null,M=[c(t.hole_height),c(t.hole_width),c(s)],I=M.some(n=>n!==null)?M.map(n=>n===null?"-":n).join("*"):"-",x=[c(t.door_height),c(t.door_width)],R=x.some(n=>n!==null)?x.map(n=>n===null?"-":n).join("*"):"-";return`
+    ${r(t.customer)}
+    ${r(t.order_no)}
+    <td>${I}</td>
+    ${r(t.style)}
+    ${r(t.color)}
+    ${r(t.frame_line)}
+    <td>${y.trim()||"-"}</td>
+    <td class="door"><strong>${R}</strong></td>
+    ${r(t.board)}`}const N=A(()=>{const t=o.value.map(e=>e.cut_date?String(e.cut_date).slice(0,10):"").filter(Boolean).sort();return t.length===0?"-":t.length===1||t[0]===t[t.length-1]?t[0]:`${t[0]} ~ ${t[t.length-1]}`}),P=A(()=>{const t=[...new Set(o.value.map(e=>e.handler).filter(Boolean))];return t.length?t.join("、"):"-"});function j(){S.push("/orders")}function D(){window.print()}const _=g("portrait");function L(){let t=document.getElementById($);t||(t=document.createElement("style"),t.id=$,document.head.appendChild(t)),t.textContent=`@page { size: A4 ${_.value}; margin: 10mm; }`}return z(_,L),q(()=>{const t=document.getElementById($);t&&t.remove()}),F(async()=>{L(),f.value=T.query.mode==="ledger"?"ledger":"single";const t=T.query.ids;if(!t){v.value=!1,U.warning("未指定打印下料单");return}try{const e=await Y.list({ids:t,page:1,pageSize:9999});o.value=e.data.list||[]}finally{v.value=!1}}),(t,e)=>{const u=b("el-radio-button"),y=b("el-radio-group"),r=b("el-button");return i(),d("div",Q,[l("div",W,[l("span",X,"下料单打印 · "+a(f.value==="single"?"单张":"批量")+" · 共 "+a(o.value.length)+" 条",1),l("div",Z,[h(y,{modelValue:_.value,"onUpdate:modelValue":e[0]||(e[0]=s=>_.value=s),size:"small"},{default:m(()=>[h(u,{value:"portrait"},{default:m(()=>[...e[1]||(e[1]=[p("A4 纵向",-1)])]),_:1}),h(u,{value:"landscape"},{default:m(()=>[...e[2]||(e[2]=[p("A4 横向",-1)])]),_:1})]),_:1},8,["modelValue"]),h(r,{onClick:j},{default:m(()=>[...e[3]||(e[3]=[p("返回",-1)])]),_:1}),h(r,{type:"primary",disabled:!o.value.length,onClick:D},{default:m(()=>[...e[4]||(e[4]=[p("打印",-1)])]),_:1},8,["disabled"])])]),v.value?(i(),d("div",w,"加载中…")):o.value.length?B("",!0):(i(),d("div",tt,"未找到下料单数据（可能未选择或已删除）。")),o.value.length?(i(),d(k,{key:2},[f.value==="single"?(i(!0),d(k,{key:0},E(o.value,s=>(i(),d("section",{key:s.id,class:"cut-sheet single"},[l("div",et,"下料单 · 订单号 "+a(s.order_no)+" · "+a(s.customer),1),l("table",nt,[l("thead",{innerHTML:C}),l("tbody",null,[l("tr",{innerHTML:H(s)},null,8,st)])]),l("div",lt,"下料日："+a(O(K)(s.cut_date))+"　经手人："+a(s.handler||"-")+"　模式："+a(s.mode===2?"特殊（手填）":"普通（自动扣尺）"),1)]))),128)):(i(),d("section",ot,[l("div",at,"下料单台账 · 共 "+a(o.value.length)+" 条",1),l("table",rt,[l("thead",{innerHTML:C}),l("tbody",null,[(i(!0),d(k,null,E(o.value,s=>(i(),d("tr",{key:s.id,innerHTML:H(s)},null,8,it))),128))])]),l("div",dt,"共 "+a(o.value.length)+" 条　下料日区间："+a(N.value)+"　经手人："+a(P.value),1)]))],64)):B("",!0)])}}};export{_t as default};

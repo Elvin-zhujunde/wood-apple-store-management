@@ -68,7 +68,7 @@ function parseTags(raw) {
   }
 }
 
-// 表头（门洞合并单列 高*宽*墙厚，门扇合并单列 高*宽；mm 标表头，值取整无小数 DB 照存）
+// 表头（门洞合并单列 高*宽*墙厚，门扇合并单列 高*宽 + 板材独立列；mm 标表头，值取整无小数 DB 照存）
 const headHtml = `
   <tr>
     <th>客户名称</th>
@@ -79,12 +79,13 @@ const headHtml = `
     <th>套板线条</th>
     <th>备注</th>
     <th>门扇(mm)<br>高*宽</th>
+    <th>板材</th>
   </tr>`
 
 // 毫米取整：DB 存 DECIMAL 带小数，展示取整无小数点（DB 照存原值）
 function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : null }
 
-// 单行 HTML：8 列；门洞=高*宽*墙厚(取整)，门扇=高*宽(取整加粗)，备注=订单备注+加工标签【】
+// 单行 HTML：9 列；门洞=高*宽*墙厚(取整)，门扇=高*宽(取整加粗)，板材独立列，备注=订单备注+加工标签【】
 function rowHtml(row) {
   const tags = parseTags(row.remark_tags)
   const tagText = tags.length ? ' ' + tags.map((t) => '【' + t + '】').join('') : ''
@@ -103,7 +104,8 @@ function rowHtml(row) {
     ${cell(row.color)}
     ${cell(row.frame_line)}
     <td>${remark.trim() || '-'}</td>
-    <td class="door"><strong>${doorText}</strong></td>`
+    <td class="door"><strong>${doorText}</strong></td>
+    ${cell(row.board)}`
 }
 
 // 批量表底汇总：下料日区间 + 去重经手人
