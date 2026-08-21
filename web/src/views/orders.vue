@@ -128,7 +128,7 @@
           <span v-else class="muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="290" fixed="right">
+      <el-table-column label="操作" width="330" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === '新建'" link type="primary" class="row-btn" @click="openShip(row)">发货</el-button>
           <el-button v-if="row.status === '已发货' || row.status === '赊账中'" link type="success" class="row-btn" @click="openPay(row)">{{ row.status === '赊账中' ? '收尾款' : '收款' }}</el-button>
@@ -140,6 +140,7 @@
             <el-button link type="primary" class="row-btn" @click="openCuttingEdit(row)">编辑</el-button>
             <el-button link type="success" class="row-btn" @click="openLabel(row)">标签</el-button>
           </template>
+          <el-button link type="danger" class="row-btn" :disabled="deletingIds.has(row.id)" @click="onDeleteOrder(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -704,6 +705,25 @@
         <el-button type="primary" @click="onSubmit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 删除确认弹窗：放大展示 XX客户的XXX订单确定删除，确认按钮 5 秒冷却 -->
+    <el-dialog v-model="delVisible" title="删除确认" width="520px" :close-on-click-modal="false">
+      <div class="del-confirm">
+        <el-icon class="del-icon"><WarningFilled /></el-icon>
+        <div class="del-text">
+          <div class="del-line">客户：<strong>{{ delRow?.customer }}</strong></div>
+          <div class="del-line">订单：<strong>{{ delRow?.order_no }}</strong></div>
+          <div class="del-line del-warn">确定删除？</div>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:8px">删除后该订单从列表移除（软删除，数据保留可恢复）。删除按钮 5 秒冷却防误删。</div>
+      <template #footer>
+        <el-button @click="delVisible = false">取消</el-button>
+        <el-button type="danger" :disabled="delCooldown > 0" :loading="delLoading" @click="confirmDelete">
+          {{ delCooldown > 0 ? `请等待 ${delCooldown}s` : '确认删除' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -714,6 +734,7 @@ import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialAp
 import { dateFmt, todayLocal } from '../utils/date'
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { WarningFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../store/user'
 import ImageUpload from '../components/ImageUpload.vue'
 import TagInput from '../components/TagInput.vue'
@@ -1243,6 +1264,47 @@ async function onCuttingDelete(row) {
   load()
 }
 
+// 订单删除：软删除 + 5秒冷却(删后该行删除按钮5秒禁用防连点) + 放大确认弹窗
+const delVisible = ref(false)
+const delRow = ref(null)
+const delCooldown = ref(0)
+const delLoading = ref(false)
+const deletingIds = ref(new Set()) // 正在删除/冷却中的订单id集合
+let delTimer = null
+
+function onDeleteOrder(row) {
+  if (deletingIds.value.has(row.id)) return
+  delRow.value = row
+  delCooldown.value = 5
+  delVisible.value = true
+  // 确认按钮5秒倒计时(冷静时间)
+  if (delTimer) clearInterval(delTimer)
+  delTimer = setInterval(() => {
+    delCooldown.value--
+    if (delCooldown.value <= 0) { clearInterval(delTimer); delTimer = null }
+  }, 1000)
+}
+
+async function confirmDelete() {
+  const row = delRow.value
+  if (!row) return
+  delLoading.value = true
+  deletingIds.value.add(row.id)
+  try {
+    await orderApi.remove(row.id)
+    ElMessage.success('删除成功')
+    delVisible.value = false
+    load()
+    // 删除成功后该行删除按钮继续禁用5秒(冷却),防止立即再删相邻订单误操作
+    setTimeout(() => { deletingIds.value.delete(row.id) }, 5000)
+  } catch (e) {
+    ElMessage.error(e.message || '删除失败')
+    deletingIds.value.delete(row.id)
+  } finally {
+    delLoading.value = false
+  }
+}
+
 // 打印：单条=单张表；批量=合并一张表（仅已下料可打印）
 function printSingle(row) {
   router.push({ path: '/cutting-list/print', query: { mode: 'single', ids: row.id } })
@@ -1450,6 +1512,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onShiftDown)
   window.removeEventListener('keyup', onShiftUp)
   window.removeEventListener('resize', onResize)
+  if (delTimer) { clearInterval(delTimer); delTimer = null }
 })
 </script>
 
@@ -1457,6 +1520,13 @@ onUnmounted(() => {
 .muted { color: #909399; font-size: 12px; }
 .tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .tag-item { margin: 0; }
+/* 删除确认弹窗：放大展示客户+订单号 */
+.del-confirm { display: flex; align-items: center; gap: 16px; }
+.del-icon { font-size: 48px; color: #f56c6c; }
+.del-text { flex: 1; }
+.del-line { font-size: 20px; line-height: 1.8; }
+.del-line strong { font-weight: 600; }
+.del-warn { color: #f56c6c; font-size: 24px; font-weight: 700; margin-top: 4px; }
 /* 批量下料分组列表 */
 .batch-cut-groups { max-height: 320px; overflow-y: auto; }
 .batch-cut-group { border: 1px solid #ebeef5; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }

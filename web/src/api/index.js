@@ -32,6 +32,7 @@ export const orderApi = {
   detail: (id) => request.get('/sales-orders/' + id),
   create: (data) => request.post('/sales-orders', data),
   update: (id, data) => request.put('/sales-orders/' + id, data),
+  remove: (id) => request.delete('/sales-orders/' + id),
   reopen: (id) => request.put('/sales-orders/' + id + '/reopen'),
   batchShip: (data) => request.put('/sales-orders/batch/ship', data),
   batchPay: (data) => request.put('/sales-orders/batch/pay', data),

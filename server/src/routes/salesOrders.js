@@ -11,7 +11,7 @@ router.get(
   '/',
   wrap(async (req, res) => {
     const { status, customer, order_no, keyword, door_bom_id, handler_sale, cut_status, ids, startDate, endDate, page = 1, pageSize = 20 } = req.query;
-    const where = [];
+    const where = ['so.deleted_at IS NULL'];
     const params = [];
     if (status) {
       where.push('so.status = ?');
@@ -341,6 +341,24 @@ router.put(
     if (cur[0].status !== '已收款') return fail(res, '仅"已收款"订单可反结');
     await pool.query("UPDATE sales_orders SET status='赊账中' WHERE id = ?", [req.params.id]);
     ok(res, { status: '赊账中' }, '已反结，回到赊账中，可重新核对收款');
+  })
+);
+
+// 软删除：标记 deleted_at，列表/统计排除。关联测量记录回待转单、采购建议解绑，防悬空引用。
+// 软删不校验状态/FK(数据保留可恢复)，权限 boss+本人经手人(对齐 measure 删除模式)
+router.delete(
+  '/:id',
+  wrap(async (req, res) => {
+    const [cur] = await pool.query('SELECT handler_sale, deleted_at FROM sales_orders WHERE id = ?', [req.params.id]);
+    if (cur.length === 0) return fail(res, '订单不存在');
+    if (cur[0].deleted_at) return fail(res, '订单已删除');
+    if (req.user.role !== 'boss' && cur[0].handler_sale !== req.user.name)
+      return fail(res, '只能删除本人经手的订单(或联系 boss)');
+    await pool.query('UPDATE sales_orders SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
+    // 解绑关联：转单的测量记录回待转单可重转；采购建议 order_id 回 NULL(历史BOM驱动遗留)
+    await pool.query("UPDATE measure_records SET status='待转单', sales_order_id=NULL WHERE sales_order_id = ?", [req.params.id]);
+    await pool.query('UPDATE purchase_suggestion SET order_id=NULL WHERE order_id = ?', [req.params.id]);
+    ok(res, null, '删除成功');
   })
 );
 

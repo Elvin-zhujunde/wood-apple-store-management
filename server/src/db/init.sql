@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   cut_handler        VARCHAR(50) NULL COMMENT '下料经手人',
   cut_remark_tags    TEXT NULL COMMENT '下料加工备注标签(JSON.stringify 字符串数组)',
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  deleted_at         DATETIME NULL COMMENT '软删除时间(NULL=未删,删除按钮5秒冷却防误删)',
+  INDEX idx_deleted_at (deleted_at),
   CONSTRAINT fk_order_bom FOREIGN KEY (door_bom_id) REFERENCES door_bom(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售订单';
 

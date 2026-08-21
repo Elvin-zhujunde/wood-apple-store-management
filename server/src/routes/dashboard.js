@@ -17,13 +17,13 @@ router.get(
          COALESCE(SUM(total_amount),0) AS total_receivable,
          COALESCE(SUM(paid_amount),0)  AS total_received,
          COALESCE(SUM(total_amount - paid_amount),0) AS total_unpaid
-       FROM sales_orders`
+       FROM sales_orders WHERE deleted_at IS NULL`
     );
     // 本月销售额(按 order_date)
     const [monthMoney] = await pool.query(
       `SELECT COALESCE(SUM(total_amount),0) AS month_sales
        FROM sales_orders
-       WHERE order_date >= DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 0 MONTH),'%Y-%m-01')`
+       WHERE deleted_at IS NULL AND order_date >= DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 0 MONTH),'%Y-%m-01')`
     );
     // 待发货金额、待收款金额（待收款含 已发货 + 赊账中：都未足额结清）
     const [pendingMoney] = await pool.query(
@@ -31,7 +31,7 @@ router.get(
               COALESCE(SUM(total_amount),0) AS amount,
               COALESCE(SUM(total_amount - paid_amount),0) AS unpaid
          FROM sales_orders
-        WHERE status IN ('新建','已发货','赊账中')
+        WHERE deleted_at IS NULL AND status IN ('新建','已发货','赊账中')
         GROUP BY status`
     );
     let pendingShipAmount = 0, pendingPayAmount = 0;
@@ -41,14 +41,14 @@ router.get(
     }
     // 订单总数、待发货数、待收款数
     const [orderStat] = await pool.query(
-      `SELECT status, COUNT(*) c FROM sales_orders GROUP BY status`
+      `SELECT status, COUNT(*) c FROM sales_orders WHERE deleted_at IS NULL GROUP BY status`
     );
 
     // --- 图表1：近6个月销售额趋势（按 order_date 月份）---
     const [trend] = await pool.query(
       `SELECT DATE_FORMAT(order_date,'%Y-%m') AS ym, COALESCE(SUM(total_amount),0) AS sales, COUNT(*) AS cnt
          FROM sales_orders
-        WHERE order_date >= DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 5 MONTH),'%Y-%m-01')
+        WHERE deleted_at IS NULL AND order_date >= DATE_FORMAT(DATE_SUB(NOW(),INTERVAL 5 MONTH),'%Y-%m-01')
         GROUP BY ym ORDER BY ym`
     );
 
@@ -83,11 +83,11 @@ router.get(
     const [pendingShip] = await pool.query(
       `SELECT o.id, o.order_no, o.customer, o.qty, o.order_date, d.name AS door_bom_name
          FROM sales_orders o LEFT JOIN door_bom d ON d.id = o.door_bom_id
-        WHERE o.status = '新建' ORDER BY o.id DESC LIMIT 5`
+        WHERE o.deleted_at IS NULL AND o.status = '新建' ORDER BY o.id DESC LIMIT 5`
     );
     const [pendingPay] = await pool.query(
       `SELECT id, order_no, customer, total_amount, paid_amount, actual_ship_date, pay_date, status
-         FROM sales_orders WHERE status IN ('已发货','赊账中') ORDER BY id DESC LIMIT 5`
+         FROM sales_orders WHERE deleted_at IS NULL AND status IN ('已发货','赊账中') ORDER BY id DESC LIMIT 5`
     );
 
     ok(res, {
