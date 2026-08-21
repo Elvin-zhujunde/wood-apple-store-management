@@ -124,7 +124,7 @@ const PAGE_STYLE_ID = 'print-page-orient'
 function applyPageStyle() {
   let el = document.getElementById(PAGE_STYLE_ID)
   if (!el) { el = document.createElement('style'); el.id = PAGE_STYLE_ID; document.head.appendChild(el) }
-  el.textContent = `@page { size: A4 ${orientation.value}; margin: 10mm; }`
+  el.textContent = `@page { size: A4 ${orientation.value}; margin: 0; }`  // margin:0 关浏览器页眉页脚(URL/页码/日期无渲染区)，内容边距改由 .cut-sheet padding 提供
 }
 watch(orientation, applyPageStyle)
 onUnmounted(() => {
@@ -176,7 +176,7 @@ onMounted(async () => {
   .no-print { display:none !important; }
   .print-root { background:#fff; padding:0; }
   /* @page 由 JS 动态注入（A4 横/纵向可选），见 applyPageStyle */
-  .cut-sheet { width:auto; min-height:auto; margin:0 0 4mm; padding:0; box-shadow:none; }
+  .cut-sheet { width:auto; min-height:auto; margin:0 0 4mm; padding:6mm 8mm; box-shadow:none; }  /* @page margin:0 后边距自给；多页中间页上下贴边=表格满版省纸 */
   .cut-sheet:last-child { margin-bottom:0; }
   .cut-table { font-size:11px; }
   .cut-table thead { display:table-header-group; } /* 表头每页重复 */
