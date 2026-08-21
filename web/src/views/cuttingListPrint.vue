@@ -51,7 +51,6 @@ const route = useRoute()
 const router = useRouter()
 const mode = ref('single')
 const list = ref([])
-const config = ref({ defaultHeightCut: 40, defaultWidthCut: 70 })
 const loading = ref(true)
 
 // remark_tags：DB 存 JSON.stringify 字符串数组，解析回数组
@@ -65,26 +64,22 @@ function parseTags(raw) {
   }
 }
 
-// 两行多维表头（忠实复刻 Excel 下料单 sheet：门洞组=高/宽/墙厚，门扇组=板材/高-扣尺/宽-扣尺）
-const headHtml = computed(() => {
-  const dh = config.value.defaultHeightCut
-  const dw = config.value.defaultWidthCut
-  return `
-    <tr>
-      <th rowspan="2">客户名称</th>
-      <th rowspan="2">订单号</th>
-      <th colspan="3">门洞</th>
-      <th rowspan="2">款式</th>
-      <th rowspan="2">颜色</th>
-      <th rowspan="2">套板线条</th>
-      <th rowspan="2">备注</th>
-      <th colspan="3">门扇</th>
-    </tr>
-    <tr>
-      <th>高</th><th>宽</th><th>墙厚</th>
-      <th>板材</th><th>高-${dh}</th><th>宽-${dw}</th>
-    </tr>`
-})
+// 两行多维表头（门洞组=高/宽/墙厚，门扇组=板材/高/宽；扣尺默认值不在表头展示）
+const headHtml = `
+  <tr>
+    <th rowspan="2">客户名称</th>
+    <th rowspan="2">订单号</th>
+    <th colspan="3">门洞</th>
+    <th rowspan="2">款式</th>
+    <th rowspan="2">颜色</th>
+    <th rowspan="2">套板线条</th>
+    <th rowspan="2">备注</th>
+    <th colspan="3">门扇</th>
+  </tr>
+  <tr>
+    <th>高</th><th>宽</th><th>墙厚</th>
+    <th>板材</th><th>高</th><th>宽</th>
+  </tr>`
 
 // 单行 HTML：12 列对齐 Excel；备注=订单备注+加工标签【】；门扇高/宽加粗
 function rowHtml(row) {
@@ -139,12 +134,8 @@ onMounted(async () => {
     return
   }
   try {
-    const [listRes, cfgRes] = await Promise.all([
-      cuttingApi.list({ ids, page: 1, pageSize: 9999 }),
-      cuttingApi.getConfig(),
-    ])
+    const listRes = await cuttingApi.list({ ids, page: 1, pageSize: 9999 })
     list.value = listRes.data.list || []
-    config.value = cfgRes.data
   } finally {
     loading.value = false
   }
