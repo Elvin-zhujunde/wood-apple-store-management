@@ -554,7 +554,9 @@
             <el-row :gutter="12">
               <el-col :span="12">
                 <el-form-item label="客户/项目" required>
-                  <el-input v-model="form.customer" :disabled="isEdit" />
+                  <el-select v-model="form.customer" :disabled="isEdit" filterable allow-create default-first-option style="width:100%" placeholder="选择客户档案,或输入新客户">
+                    <el-option v-for="c in customerList" :key="c.id" :label="c.name" :value="c.name" />
+                  </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -708,7 +710,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi } from '../api'
+import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi, customerApi } from '../api'
 import { dateFmt, todayLocal } from '../utils/date'
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -724,6 +726,7 @@ const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
+const customerList = ref([]) // 客户档案下拉源(接单从档案选,allow-create 允许新客户)
 
 // 列配置器：全量列定义（现有列默认显示，新增可选列 defaultVisible:false 默认隐藏）
 // key 与 colVisible(key) 对应；操作列固定显示不进配置器
@@ -1428,6 +1431,7 @@ async function onBatchReq() {
 
 onMounted(async () => {
   bomList.value = (await bomApi.all()).data
+  customerList.value = (await customerApi.all()).data || []
   materialList.value = (await materialApi.all()).data || []
   cutConfig.value = (await cuttingApi.getConfig()).data
   cutTagOptions.value = (await cuttingApi.getTags()).data || []
