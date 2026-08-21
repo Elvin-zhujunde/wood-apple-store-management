@@ -222,11 +222,12 @@ router.post(
       // 标签相关字段（lock_hole/sub_customer）
       lock_hole, sub_customer,
     } = req.body;
-    if (!customer || !door_bom_id || !color || !qty || !unit_price || !handler_sale || !order_date)
-      return fail(res, '客户/门型/颜色/数量/单价/经手人/下单日期 必填');
+    if (!customer || !door_bom_id || !color || !qty || !handler_sale || !order_date)
+      return fail(res, '客户/门型/颜色/数量/经手人/下单日期 必填');
 
     const order_no = await genDocNo('sales_orders', 'SO', 'order');
-    const total_amount = qty * Number(unit_price);
+    // 单价非必填(免费送可为0/空),后端兜底归一为数字(DB列NOT NULL,空落0)
+    const total_amount = qty * (Number(unit_price) || 0);
 
     // R4(ARE-107)：删除"约定发货日"录入，expected_ship_date 不再接收（DB字段保留给历史数据）
     const [r] = await pool.query(
@@ -237,7 +238,7 @@ router.post(
          remark, edge_band, frame_line, customer_type, address,
          hardware, lock_hole)
        VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?, ?, ?)`,
-      [order_no, customer, sub_customer || null, door_bom_id, color, qty, unit_price, total_amount,
+      [order_no, customer, sub_customer || null, door_bom_id, color, qty, Number(unit_price) || 0, total_amount,
        handler_sale, order_date,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
        remark || null, edge_band || null, frame_line || null, customer_type || null, address || null,
@@ -285,7 +286,7 @@ router.put(
     // 状态自动流转（赊账中间态：部分付款=赊账中，足额=已收款）
     // pay_date+paid>=total → 已收款(已完成)；pay_date+0<paid<total → 赊账中；仅发货 → 已发货；否则新建
     const paid = (paid_amount !== undefined && paid_amount !== null) ? Number(paid_amount) : 0;
-    const total = qty ? qty * Number(unit_price) : 0;
+    const total = qty ? qty * (Number(unit_price) || 0) : 0;
     let derived = '新建';
     if (pay_date && paid > 0) {
       derived = paid >= total ? '已收款' : '赊账中';
@@ -304,7 +305,7 @@ router.put(
     const finalHandlerFinance = locked ? curRow.handler_finance : (handler_finance || null);
     const finalPayMethod = locked ? curRow.pay_method : (pay_method || null);
 
-    const total_amount = qty ? qty * Number(unit_price) : undefined;
+    const total_amount = qty ? qty * (Number(unit_price) || 0) : undefined;
 
     await pool.query(
       `UPDATE sales_orders SET
@@ -317,7 +318,7 @@ router.put(
         salesperson=?, installer=?, biz_fee=?, lock_hole=?,
         status=?
        WHERE id=?`,
-      [customer, sub_customer || null, door_bom_id, color, qty, unit_price, total_amount,
+      [customer, sub_customer || null, door_bom_id, color, qty, Number(unit_price) || 0, total_amount,
        normDate(actual_ship_date), ship_no || null, handler_ship || null,
        finalPayDate, finalReceiptNo, finalHandlerFinance, finalPaidAmount,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,

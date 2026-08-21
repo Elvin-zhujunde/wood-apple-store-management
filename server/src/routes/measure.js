@@ -213,8 +213,8 @@ router.post(
   wrap(async (req, res) => {
     const { door_bom_id, color, qty, unit_price, handler_sale, order_date,
             lock_hole, style, board } = req.body;
-    if (!door_bom_id || !color || !qty || (unit_price === null || unit_price === undefined || unit_price === '') || !handler_sale || !order_date)
-      return fail(res, '门型/颜色/单价/经手人/下单日期 必填');
+    if (!door_bom_id || !color || !qty || !handler_sale || !order_date)
+      return fail(res, '门型/颜色/数量/经手人/下单日期 必填');
 
     const conn = await pool.getConnection();
     try {
@@ -232,7 +232,7 @@ router.post(
       if (m.status !== '待转单') { await conn.rollback(); return fail(res, '该记录已转单，不可重复转单'); }
 
       const order_no = await genDocNo('sales_orders', 'SO', 'order', conn);
-      const total_amount = qty * Number(unit_price);
+      const total_amount = qty * (Number(unit_price) || 0);
       const remarkMerged = (m.remark ? `[现场测量] ${m.remark}` : '[现场测量]') ;
 
       // 字段顺序对照 salesOrders.js 接单 INSERT + init.sql sales_orders 表结构（命名列插入，列名对齐表定义）
@@ -243,7 +243,7 @@ router.post(
            handler_sale, order_date, status,
            door_h, door_w, wall_thick, remark, hardware, lock_hole, style, board)
          VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?, NULL, ?, ?, ?)`,
-        [order_no, m.customer_name, m.location_name, door_bom_id, color, qty, unit_price, total_amount,
+        [order_no, m.customer_name, m.location_name, door_bom_id, color, qty, Number(unit_price) || 0, total_amount,
          handler_sale, order_date,
          m.door_h, m.door_w, m.wall_thick, remarkMerged,
          lock_hole || null, style || null, board || null]
@@ -288,7 +288,7 @@ router.post(
         const { id, door_bom_id, color, qty, unit_price, handler_sale, order_date,
                 lock_hole, style, board } = item;
         // 6 必填校验，缺则跳过（单价允许为0：送门业务）
-        if (!id || !door_bom_id || !color || !qty || (unit_price === null || unit_price === undefined || unit_price === '') || !handler_sale || !order_date) {
+        if (!id || !door_bom_id || !color || !qty || !handler_sale || !order_date) {
           skipped++; results.push({ id, skipped: true, reason: '字段缺失' }); continue;
         }
         const [ms] = await conn.query(
@@ -304,7 +304,7 @@ router.post(
         if (m.status !== '待转单') { skipped++; results.push({ id, skipped: true, reason: '已转单' }); continue; }
 
         const order_no = await genDocNo('sales_orders', 'SO', 'order', conn);
-        const total_amount = qty * Number(unit_price);
+        const total_amount = qty * (Number(unit_price) || 0);
         const remarkMerged = m.remark ? `[现场测量] ${m.remark}` : '[现场测量]';
         const [r] = await conn.query(
           `INSERT INTO sales_orders
@@ -312,7 +312,7 @@ router.post(
              handler_sale, order_date, status,
              door_h, door_w, wall_thick, remark, hardware, lock_hole, style, board)
            VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?, NULL, ?, ?, ?)`,
-          [order_no, m.customer_name, m.location_name, door_bom_id, color, qty, unit_price, total_amount,
+          [order_no, m.customer_name, m.location_name, door_bom_id, color, qty, Number(unit_price) || 0, total_amount,
            handler_sale, order_date,
            m.door_h, m.door_w, m.wall_thick, remarkMerged,
            lock_hole || null, style || null, board || null]

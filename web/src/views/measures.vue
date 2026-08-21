@@ -193,14 +193,14 @@ const onBatchConvert = async () => {
 const onBatchBomChange = (id) => { batchCommon.value.color = colorsOf(id)[0] || '' }
 const doBatchConvert = async () => {
   const c = batchCommon.value
-  if (!c.door_bom_id || !c.color || (c.unit_price === null || c.unit_price === undefined || c.unit_price === '') || !c.handler_sale || !c.order_date) {
-    ElMessage.warning('统一设置：门型/颜色/单价/经手人/下单日期 必填'); return
+  if (!c.door_bom_id || !c.color || !c.handler_sale || !c.order_date) {
+    ElMessage.warning('统一设置：门型/颜色/经手人/下单日期 必填'); return
   }
   // 构造 items：覆盖行用 row.form（4 字段）+ 统一（其余 5 字段）；非覆盖行全用统一
   const items = batchRows.value.map(r => {
     if (r.override) {
       const f = r.form
-      if (!f.door_bom_id || !f.color || (f.unit_price === null || f.unit_price === undefined || f.unit_price === '')) return { id: r.id, _invalid: true }
+      if (!f.door_bom_id || !f.color) return { id: r.id, _invalid: true }
       return { id: r.id, door_bom_id: f.door_bom_id, color: f.color, qty: f.qty, unit_price: f.unit_price, handler_sale: c.handler_sale, order_date: c.order_date, lock_hole: c.lock_hole, style: c.style, board: c.board }
     }
     return { id: r.id, door_bom_id: c.door_bom_id, color: c.color, qty: c.qty, unit_price: c.unit_price, handler_sale: c.handler_sale, order_date: c.order_date, lock_hole: c.lock_hole, style: c.style, board: c.board }
@@ -238,8 +238,8 @@ const onRowBomChange = (row) => { row.form.color = colorsOf(row.form.door_bom_id
 const onConvBomChange = (id) => { convForm.value.color = colorsOf(id)[0] || '' }
 const doConvert = async () => {
   const f = convForm.value
-  if (!f.door_bom_id || !f.color || (f.unit_price === null || f.unit_price === undefined || f.unit_price === '') || !f.handler_sale || !f.order_date) {
-    ElMessage.warning('门型/颜色/单价/经手人/下单日期 必填'); return
+  if (!f.door_bom_id || !f.color || !f.handler_sale || !f.order_date) {
+    ElMessage.warning('门型/颜色/经手人/下单日期 必填'); return
   }
   converting.value = true
   try {

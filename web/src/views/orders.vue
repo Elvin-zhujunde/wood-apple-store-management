@@ -594,7 +594,7 @@
                 <el-form-item label="门扇板材"><el-input v-model="form.board" placeholder="如 3号 / 5号" /></el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="销售单价" required><el-input-number v-model="form.unit_price" :min="0" :precision="2" style="width:100%" /></el-form-item>
+                <el-form-item label="销售单价"><el-input-number v-model="form.unit_price" :min="0" :precision="2" style="width:100%" placeholder="免费送填0或留空" /></el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="经手人(销售)" required><el-input v-model="form.handler_sale" /></el-form-item>
@@ -1079,7 +1079,7 @@ function onBomChange() {
 
 async function onSubmit() {
   const f = form.value
-  if (!f.customer || !f.door_bom_id || !f.color || !f.qty || !f.unit_price || !f.handler_sale || !f.order_date) {
+  if (!f.customer || !f.door_bom_id || !f.color || !f.qty || !f.handler_sale || !f.order_date) {
     return ElMessage.warning('请补全订单必填项')
   }
   if (isEdit.value) {
