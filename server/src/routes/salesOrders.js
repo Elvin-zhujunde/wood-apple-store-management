@@ -236,7 +236,7 @@ router.post(
          door_h, door_w, wall_thick, style, board,
          remark, edge_band, frame_line, customer_type, address,
          hardware, lock_hole)
-       VALUES (?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?, ?, ?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?, '新建', ?,?,?,?,?,?,?,?,?,?, ?, ?)`,
       [order_no, customer, sub_customer || null, door_bom_id, color, qty, unit_price, total_amount,
        handler_sale, order_date,
        door_h || null, door_w || null, wall_thick || null, style || null, board || null,
