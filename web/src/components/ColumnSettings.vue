@@ -1,14 +1,21 @@
 <template>
-  <el-popover trigger="click" placement="bottom-end" :width="width" :teleported="true">
-    <template #reference>
-      <el-button :icon="Setting" size="small" title="列设置">列设置</el-button>
-    </template>
+  <el-button :icon="Setting" size="small" title="列设置" @click="visible = true">列设置</el-button>
+  <el-drawer
+    v-model="visible"
+    title="列设置"
+    direction="rtl"
+    size="440px"
+    :with-header="true"
+  >
     <div class="col-settings">
       <div class="col-settings-hd">
-        <span>显示列（{{ visibleProps.length }}/{{ columns.length }}）</span>
-        <el-button link size="small" @click="resetDefaults">重置</el-button>
+        <span>显示列 <b>{{ visibleProps.length }}</b> / {{ columns.length }}</span>
+        <div>
+          <el-button link size="small" @click="toggleAll">{{ allOn ? '全部隐藏' : '全部显示' }}</el-button>
+          <el-button link size="small" @click="resetDefaults">重置</el-button>
+        </div>
       </div>
-      <div class="col-settings-tip-top">拖拽排序 · 勾选显隐</div>
+      <div class="col-settings-tip">拖动 = 调整列顺序 · 开关 = 显示/隐藏 · 自动记忆</div>
       <div class="col-settings-list">
         <div
           v-for="(c, idx) in orderedCols"
@@ -22,34 +29,51 @@
           @drop="onDrop(idx)"
           @dragend="onDragEnd"
         >
-          <el-icon class="drag-handle"><Rank /></el-icon>
-          <el-checkbox v-model="visibleProps" :value="c.prop" :label="c.prop">{{ c.label }}</el-checkbox>
+          <el-icon class="drag-handle" title="拖拽排序"><Rank /></el-icon>
+          <span class="col-idx">{{ idx + 1 }}</span>
+          <span class="col-label">{{ c.label }}</span>
+          <el-switch :model-value="isVisible(c.prop)" size="small" @change="(v) => toggleProp(c.prop, v)" />
         </div>
       </div>
-      <div class="col-settings-tip">拖动左侧图标调整列顺序，勾选显示/隐藏，自动记忆</div>
     </div>
-  </el-popover>
+    <template #footer>
+      <div class="drawer-foot">
+        <el-button @click="visible = false">完成</el-button>
+      </div>
+    </template>
+  </el-drawer>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Setting, Rank } from '@element-plus/icons-vue'
 
 // columns: [{ prop, label, defaultVisible }]——defaultVisible 省略或 true=默认显示
-// storageKey: localStorage 键，按页面隔离记忆（visible 存 ${storageKey}，order 存 ${storageKey}-order）
+// storageKey: localStorage 键，按页面隔离记忆（visible 存 ${storageKey}-visible，order 存 ${storageKey}-order）
 // emit change: { visible, order }——visible=显示的 prop 数组，order=全部 prop 的排序数组
 const props = defineProps({
   columns: { type: Array, required: true },
   storageKey: { type: String, required: true },
-  width: { type: Number, default: 240 },
 })
 const emit = defineEmits(['change'])
 
-const visibleProps = ref([])
+const visible = ref(false) // 抽屉显隐
+const visibleProps = ref([]) // 显示的 prop 数组
 const orderedCols = ref([]) // 全部列按当前排序（含隐藏），驱动列表渲染与拖拽
 
 const dragIdx = ref(-1)    // 正在拖拽的项索引
 const dragOverIdx = ref(-1) // 拖拽悬停目标索引
+
+const allOn = computed(() => visibleProps.value.length === props.columns.length)
+
+function isVisible(prop) { return visibleProps.value.includes(prop) }
+function toggleProp(prop, on) {
+  if (on) {
+    if (!visibleProps.value.includes(prop)) visibleProps.value = [...visibleProps.value, prop]
+  } else {
+    visibleProps.value = visibleProps.value.filter((p) => p !== prop)
+  }
+}
 
 function defaultsVisible() {
   return props.columns.filter((c) => c.defaultVisible !== false).map((c) => c.prop)
@@ -80,6 +104,9 @@ function resetDefaults() {
   orderedCols.value = [...props.columns]
   visibleProps.value = defaultsVisible()
 }
+function toggleAll() {
+  visibleProps.value = allOn.value ? [] : props.columns.map((c) => c.prop)
+}
 
 // HTML5 拖拽排序
 function onDragStart(idx, e) {
@@ -109,8 +136,7 @@ function persist() {
   const order = orderedCols.value.map((c) => c.prop)
   localStorage.setItem(props.storageKey + '-order', JSON.stringify(order))
   localStorage.setItem(props.storageKey + '-visible', JSON.stringify(visibleProps.value))
-  // 清理旧键（迁移后不再用）
-  localStorage.removeItem(props.storageKey)
+  localStorage.removeItem(props.storageKey) // 清理旧键
   emit('change', { visible: [...visibleProps.value], order })
 }
 
@@ -124,14 +150,17 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.col-settings { font-size: 13px; }
-.col-settings-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-weight: 600; }
-.col-settings-tip-top { font-size: 11px; color: #909399; margin-bottom: 6px; }
-.col-settings-list { display: flex; flex-direction: column; gap: 2px; max-height: 360px; overflow-y: auto; }
-.col-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: grab; transition: background .12s; }
+.col-settings { font-size: 14px; }
+.col-settings-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: 600; }
+.col-settings-hd b { color: #409eff; }
+.col-settings-tip { font-size: 12px; color: #909399; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #ebeef5; }
+.col-settings-list { display: flex; flex-direction: column; gap: 2px; }
+.col-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; border: 1px solid transparent; cursor: grab; transition: background .12s, border-color .12s; }
 .col-row:hover { background: #f5f7fa; }
 .col-row.dragging { opacity: .4; }
-.col-row.drag-over { background: #ecf5ff; box-shadow: inset 0 2px 0 #409eff; }
+.col-row.drag-over { background: #ecf5ff; border-color: #409eff; }
 .drag-handle { color: #c0c4cc; cursor: grab; flex-shrink: 0; }
-.col-settings-tip { margin-top: 8px; font-size: 11px; color: #909399; }
+.col-idx { width: 22px; height: 22px; line-height: 22px; text-align: center; background: #f0f2f5; border-radius: 50%; font-size: 12px; color: #909399; flex-shrink: 0; }
+.col-label { flex: 1; }
+.drawer-foot { text-align: right; }
 </style>
