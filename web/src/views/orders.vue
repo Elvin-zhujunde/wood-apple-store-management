@@ -43,11 +43,11 @@
       >
         <template #default="{ row }">
           <template v-if="col.prop === 'size'">
-            <span v-if="row.door_h || row.door_w">{{ row.door_h || '-' }}×{{ row.door_w || '-' }}</span>
+            <span v-if="row.door_h || row.door_w || row.wall_thick">{{ mmInt(row.door_h) }}*{{ mmInt(row.door_w) }}*{{ mmInt(row.wall_thick) }}</span>
             <span v-else class="muted">-</span>
           </template>
           <template v-else-if="col.prop === 'cut_door'">
-            <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ row.cut_door_height }}×{{ row.cut_door_width }}</span>
+            <span v-if="row.cut_door_height || row.cut_door_width" style="color:#f56c6c;font-weight:600">{{ mmInt(row.cut_door_height) }}×{{ mmInt(row.cut_door_width) }}</span>
             <span v-else class="muted">未下料</span>
           </template>
           <template v-else-if="col.prop === 'cut_status'">
@@ -686,6 +686,9 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi, customerApi } from '../api'
 import { fmtDate, todayLocal } from '../utils/date'
+
+// 毫米取整：DB 存 DECIMAL(8,2) 带小数，列表/打印展示取整无小数点（DB 照存原值不动）
+function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : '-' }
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
@@ -708,8 +711,7 @@ const customerList = ref([]) // 客户档案下拉源(接单从档案选,allow-c
 const allColumns = [
   { prop: 'order_no', label: '订单号', width: 160 },
   { prop: 'customer', label: '客户', minWidth: 120 },
-  { prop: 'size', label: '尺寸(高×宽)', width: 150 },
-  { prop: 'wall_thick', label: '墙厚', width: 90, align: 'center' },
+  { prop: 'size', label: '尺寸(高*宽*墙厚)', width: 170, align: 'center' },
   { prop: 'cut_door', label: '门扇(高×宽)', width: 150 },
   { prop: 'cut_status', label: '下料状态', width: 90 },
   { prop: 'cut_date', label: '下料日', width: 110, date: true },

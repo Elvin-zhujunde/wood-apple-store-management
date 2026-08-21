@@ -68,43 +68,42 @@ function parseTags(raw) {
   }
 }
 
-// 两行多维表头（门洞组=高/宽/墙厚，门扇组=板材/高/宽；扣尺默认值不在表头展示）
+// 表头（门洞合并单列 高*宽*墙厚，门扇合并单列 高*宽；mm 标表头，值取整无小数 DB 照存）
 const headHtml = `
   <tr>
-    <th rowspan="2">客户名称</th>
-    <th rowspan="2">订单号</th>
-    <th colspan="3">门洞</th>
-    <th rowspan="2">款式</th>
-    <th rowspan="2">颜色</th>
-    <th rowspan="2">套板线条</th>
-    <th rowspan="2">备注</th>
-    <th colspan="3">门扇</th>
-  </tr>
-  <tr>
-    <th>高</th><th>宽</th><th>墙厚</th>
-    <th>板材</th><th>高</th><th>宽</th>
+    <th>客户名称</th>
+    <th>订单号</th>
+    <th>门洞(mm)<br>高*宽*墙厚</th>
+    <th>款式</th>
+    <th>颜色</th>
+    <th>套板线条</th>
+    <th>备注</th>
+    <th>门扇(mm)<br>高*宽</th>
   </tr>`
 
-// 单行 HTML：12 列对齐 Excel；备注=订单备注+加工标签【】；门扇高/宽加粗
+// 毫米取整：DB 存 DECIMAL 带小数，展示取整无小数点（DB 照存原值）
+function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : null }
+
+// 单行 HTML：8 列；门洞=高*宽*墙厚(取整)，门扇=高*宽(取整加粗)，备注=订单备注+加工标签【】
 function rowHtml(row) {
   const tags = parseTags(row.remark_tags)
   const tagText = tags.length ? ' ' + tags.map((t) => '【' + t + '】').join('') : ''
   const remark = (row.remark || '') + tagText
   const cell = (v) => `<td>${v != null && v !== '' ? v : '-'}</td>`
-  const wall = row.wall_thick != null ? row.wall_thick : (row.wall_thickness != null ? row.wall_thickness : '-')
+  const wall = row.wall_thick != null ? row.wall_thick : (row.wall_thickness != null ? row.wall_thickness : null)
+  const holeParts = [mmInt(row.hole_height), mmInt(row.hole_width), mmInt(wall)]
+  const holeText = holeParts.some((p) => p !== null) ? holeParts.map((p) => (p === null ? '-' : p)).join('*') : '-'
+  const doorParts = [mmInt(row.door_height), mmInt(row.door_width)]
+  const doorText = doorParts.some((p) => p !== null) ? doorParts.map((p) => (p === null ? '-' : p)).join('*') : '-'
   return `
     ${cell(row.customer)}
     ${cell(row.order_no)}
-    ${cell(row.hole_height)}
-    ${cell(row.hole_width)}
-    ${cell(wall)}
+    <td>${holeText}</td>
     ${cell(row.style)}
     ${cell(row.color)}
     ${cell(row.frame_line)}
     <td>${remark.trim() || '-'}</td>
-    ${cell(row.board)}
-    <td class="door"><strong>${row.door_height != null ? row.door_height : '-'}</strong></td>
-    <td class="door"><strong>${row.door_width != null ? row.door_width : '-'}</strong></td>`
+    <td class="door"><strong>${doorText}</strong></td>`
 }
 
 // 批量表底汇总：下料日区间 + 去重经手人
