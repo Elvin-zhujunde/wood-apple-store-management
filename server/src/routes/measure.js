@@ -6,6 +6,11 @@ const { auth, requireRole } = require('../middlewares/auth');
 const router = express.Router();
 router.use(auth);
 
+// DECIMAL 字段归一化：前端 v-model.number 留空时值为空串 ''（非 null），
+// MySQL 严格模式拒收 '' 写 DECIMAL 列（报 Incorrect decimal value: ''）。
+// 空串/undefined/null 统一转 null（列已允许 NULL），有值原样透传。
+const numOrNull = (v) => (v === '' || v == null ? null : v);
+
 // 我的测量记录列表（按 measured_by=JWT.name 过滤，分页）
 router.get(
   '/',
@@ -122,8 +127,11 @@ router.post(
   '/',
   wrap(async (req, res) => {
     const { customer_id, location_id, door_h, door_w, wall_thick, remark, photo_ids = [] } = req.body;
-    if (!customer_id || !location_id || door_h == null || door_w == null)
+    // 必填挡空串：door_h/door_w 留空传 '' 时 == null 为 false 会漏，故同时挡 ''
+    if (!customer_id || !location_id || door_h == null || door_h === '' || door_w == null || door_w === '')
       return fail(res, '客户/安装定位/门洞高宽 必填（墙厚可空）');
+    // DECIMAL 字段空串归一 null（防 MySQL 严格模式 Incorrect decimal value: ''）
+    const dh = numOrNull(door_h), dw = numOrNull(door_w), wt = numOrNull(wall_thick);
     // 校验 location 归属 customer
     const [locs] = await pool.query(
       'SELECT id FROM customer_locations WHERE id = ? AND customer_id = ?',
@@ -136,7 +144,7 @@ router.post(
       const [r] = await conn.query(
         `INSERT INTO measure_records (customer_id, location_id, door_h, door_w, wall_thick, remark, measured_by, measured_at, status)
          VALUES (?,?,?,?,?,?,?,?, '待转单')`,
-        [customer_id, location_id, door_h, door_w, wall_thick, remark || null, req.user.name, new Date()]
+        [customer_id, location_id, dh, dw, wt, remark || null, req.user.name, new Date()]
       );
       const id = r.insertId;
       // 回填照片 entity_id
@@ -170,9 +178,10 @@ router.put(
     if (rows.length === 0) return fail(res, '记录不存在');
     if (rows[0].measured_by !== req.user.name) return fail(res, '只能编辑自己的记录');
     if (rows[0].status !== '待转单') return fail(res, '已转单记录不可编辑');
+    // DECIMAL 字段空串归一 null（防 MySQL 严格模式 Incorrect decimal value: ''）
     await pool.query(
       'UPDATE measure_records SET door_h=?, door_w=?, wall_thick=?, remark=? WHERE id=?',
-      [door_h, door_w, wall_thick, remark || null, req.params.id]
+      [numOrNull(door_h), numOrNull(door_w), numOrNull(wall_thick), remark || null, req.params.id]
     );
     ok(res, null, '更新成功');
   })
