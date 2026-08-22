@@ -42,7 +42,7 @@
       </van-cell-group>
       <div class="bar">
         <van-button block @click="step=1">上一步</van-button>
-        <van-button block type="primary" :disabled="!form.door_h||!form.door_w||!form.wall_thick" @click="step=3" style="margin-top:8px">下一步</van-button>
+        <van-button block type="primary" :disabled="!form.door_h||!form.door_w" @click="step=3" style="margin-top:8px">下一步</van-button>
       </div>
     </div>
 

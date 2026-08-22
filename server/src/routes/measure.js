@@ -122,8 +122,8 @@ router.post(
   '/',
   wrap(async (req, res) => {
     const { customer_id, location_id, door_h, door_w, wall_thick, remark, photo_ids = [] } = req.body;
-    if (!customer_id || !location_id || door_h == null || door_w == null || wall_thick == null)
-      return fail(res, '客户/安装定位/门洞高宽/墙厚 必填');
+    if (!customer_id || !location_id || door_h == null || door_w == null)
+      return fail(res, '客户/安装定位/门洞高宽 必填（墙厚可空）');
     // 校验 location 归属 customer
     const [locs] = await pool.query(
       'SELECT id FROM customer_locations WHERE id = ? AND customer_id = ?',

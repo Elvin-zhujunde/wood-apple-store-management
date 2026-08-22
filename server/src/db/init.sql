@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS measure_records (
   location_id     INT NOT NULL COMMENT '安装定位(现场必选/新建)',
   door_h          DECIMAL(8,2) NOT NULL COMMENT '门洞高(mm) 必填',
   door_w          DECIMAL(8,2) NOT NULL COMMENT '门洞宽(mm) 必填',
-  wall_thick      DECIMAL(8,2) NOT NULL COMMENT '墙厚(mm) 必填',
+  wall_thick      DECIMAL(8,2) NULL COMMENT '墙厚(mm) 可空(现场量尺墙厚非必填)',
   remark          VARCHAR(500) NULL COMMENT '现场备注',
   measured_by     VARCHAR(50) NOT NULL COMMENT '测量人(取JWT.name)',
   measured_at     DATETIME NOT NULL COMMENT '测量时间',
