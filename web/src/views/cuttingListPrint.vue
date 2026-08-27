@@ -56,7 +56,7 @@ function parseTags(raw) {
   }
 }
 
-// 表头（门洞合并单列 高*宽*墙厚，门扇合并单列 高*宽 + 板材独立列；mm 标表头，值取整无小数 DB 照存）
+// 表头（门洞合并单列 高*宽*墙厚，门扇合并单列 高*宽 + 板材独立列；备注拆订单备注+加工备注两列；mm 标表头，值取整无小数 DB 照存）
 const headHtml = `
   <tr>
     <th>客户名称</th>
@@ -65,7 +65,8 @@ const headHtml = `
     <th>款式</th>
     <th>颜色</th>
     <th>套板线条</th>
-    <th>备注</th>
+    <th>订单备注</th>
+    <th>加工备注</th>
     <th>门扇(mm)<br>高*宽</th>
     <th>板材</th>
   </tr>`
@@ -73,11 +74,12 @@ const headHtml = `
 // 毫米取整：DB 存 DECIMAL 带小数，展示取整无小数点（DB 照存原值）
 function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : null }
 
-// 单行 HTML：9 列；门洞=高*宽*墙厚(取整)，门扇=高*宽(取整加粗)，板材独立列，备注=订单备注+加工标签【】
+// 单行 HTML：10 列；门洞=高*宽*墙厚(取整)，门扇=高*宽(取整加粗)，板材独立列，
+// 订单备注独立列 + 加工备注独立列(标签【】拆出单独成列，醒目)
 function rowHtml(row) {
   const tags = parseTags(row.remark_tags)
-  const tagText = tags.length ? ' ' + tags.map((t) => '【' + t + '】').join('') : ''
-  const remark = (row.remark || '') + tagText
+  const tagText = tags.length ? tags.map((t) => '【' + t + '】').join('') : ''
+  const remark = row.remark || ''
   const cell = (v) => `<td>${v != null && v !== '' ? v : '-'}</td>`
   const wall = row.wall_thick != null ? row.wall_thick : (row.wall_thickness != null ? row.wall_thickness : null)
   const holeParts = [mmInt(row.hole_height), mmInt(row.hole_width), mmInt(wall)]
@@ -92,6 +94,7 @@ function rowHtml(row) {
     ${cell(row.color)}
     ${cell(row.frame_line)}
     <td>${remark.trim() || '-'}</td>
+    <td>${tagText || '-'}</td>
     <td class="door"><strong>${doorText}</strong></td>
     ${cell(row.board)}`
 }
