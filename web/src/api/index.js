@@ -43,6 +43,7 @@ export const orderApi = {
 // 采购入库
 export const inboundApi = {
   list: (params) => request.get('/purchase-inbound', { params }),
+  suppliers: () => request.get('/purchase-inbound/suppliers'),
   detail: (id) => request.get('/purchase-inbound/' + id),
   create: (data) => request.post('/purchase-inbound', data),
   confirm: (id, data) => request.put('/purchase-inbound/' + id + '/confirm', data),

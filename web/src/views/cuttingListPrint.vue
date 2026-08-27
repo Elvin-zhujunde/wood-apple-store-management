@@ -67,7 +67,7 @@ const headHtml = `
     <th>套板线条</th>
     <th>订单备注</th>
     <th>加工备注</th>
-    <th>门扇(mm)<br>高*宽</th>
+    <th>原始尺寸(mm)<br>高*宽</th>
     <th>板材</th>
   </tr>`
 
@@ -78,7 +78,8 @@ function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : null 
 // 订单备注独立列 + 加工备注独立列(标签【】拆出单独成列，醒目)
 function rowHtml(row) {
   const tags = parseTags(row.remark_tags)
-  const tagText = tags.length ? tags.map((t) => '【' + t + '】').join('') : ''
+  // 每个标签独立 span 块 + 间距隔开渲染（加工备注重要，须清晰可辨，不连成一串）
+  const tagText = tags.length ? tags.map((t) => '<span class="tag-item">【' + t + '】</span>').join(' ') : ''
   const remark = row.remark || ''
   const cell = (v) => `<td>${v != null && v !== '' ? v : '-'}</td>`
   const wall = row.wall_thick != null ? row.wall_thick : (row.wall_thickness != null ? row.wall_thickness : null)
@@ -171,6 +172,7 @@ onMounted(async () => {
 .cut-table th, .cut-table td { border:1px solid #000; padding:3px 4px; text-align:center; vertical-align:middle; line-height:1.3; }
 .cut-table th { background:#eee; font-weight:600; }
 .cut-table td.door { font-size:13px; }
+.cut-table .tag-item { display:inline-block; margin:1px 3px; padding:0 3px; white-space:nowrap; }
 
 /* 表底小字汇总行 */
 .sheet-foot { margin-top:6px; padding-top:4px; border-top:1px solid #999; font-size:11px; color:#333; }

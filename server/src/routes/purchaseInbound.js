@@ -35,6 +35,21 @@ router.get(
   })
 );
 
+// 厂家联想：进货厂家可搜索已有厂家（并集：历史入库 supplier + 物料档案 manufacturer，去重排序）
+// 须在 GET /:id 之前注册，否则被参数路由吞掉
+router.get(
+  '/suppliers',
+  wrap(async (req, res) => {
+    const [rows] = await pool.query(
+      `SELECT supplier AS name FROM purchase_inbound WHERE supplier IS NOT NULL AND supplier <> ''
+        UNION
+       SELECT manufacturer AS name FROM materials WHERE manufacturer IS NOT NULL AND manufacturer <> ''
+       ORDER BY name`
+    );
+    ok(res, rows.map((r) => r.name));
+  })
+);
+
 // 批量确认到货：勾选的"待到货"入库单统一填到货日 → 批量加库存+写流水
 // 逐条独立事务，单条失败不影响其他条；已到货的自动跳过
 router.put(

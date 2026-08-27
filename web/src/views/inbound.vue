@@ -5,7 +5,9 @@
       <el-select v-model="query.material_id" placeholder="物料" clearable filterable style="width:160px" @change="load">
         <el-option v-for="m in mats" :key="m.id" :label="`${m.code} ${m.name}`" :value="m.id" />
       </el-select>
-      <el-input v-model="query.supplier" placeholder="厂家" clearable style="width:140px" @change="load" />
+      <el-select v-model="query.supplier" placeholder="厂家" clearable filterable allow-create default-first-option style="width:160px" @change="load">
+        <el-option v-for="s in suppliers" :key="s" :label="s" :value="s" />
+      </el-select>
       <el-input v-model="query.handler" placeholder="经手人" clearable style="width:110px" @change="load" />
       <el-select v-model="query.status" placeholder="状态" clearable style="width:110px" @change="load">
         <el-option label="待到货" value="待到货" />
@@ -63,7 +65,11 @@
             </el-select>
           </el-form-item></el-col>
           <el-col :span="12"><el-form-item label="规格"><el-input :model-value="curSpec" disabled /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="进货厂家" required><el-input v-model="form.supplier" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="进货厂家" required>
+            <el-select v-model="form.supplier" filterable allow-create default-first-option style="width:100%" placeholder="选择或输入厂家">
+              <el-option v-for="s in suppliers" :key="s" :label="s" :value="s" />
+            </el-select>
+          </el-form-item></el-col>
           <el-col :span="12"><el-form-item label="进货数量" required><el-input-number v-model="form.qty" :min="0" :precision="3" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="进货单价" required><el-input-number v-model="form.unit_price" :min="0" :precision="2" style="width:100%" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="物流费用"><el-input-number v-model="form.freight" :min="0" :precision="2" style="width:100%" /></el-form-item></el-col>
@@ -132,6 +138,7 @@ const query = ref({ inbound_no: '', material_id: '', supplier: '', handler: '', 
 const list = ref([])
 const total = ref(0)
 const mats = ref([])
+const suppliers = ref([])
 const addVisible = ref(false)
 const confirmVisible = ref(false)
 const confirmId = ref(null)
@@ -249,6 +256,7 @@ async function openImages(row) {
 
 onMounted(async () => {
   mats.value = (await materialApi.all()).data
+  suppliers.value = (await inboundApi.suppliers()).data
   load()
 })
 </script>
