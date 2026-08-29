@@ -115,7 +115,7 @@ onMounted(async () => {
 .state-tip { max-width:200mm; margin:40px auto; text-align:center; color:#909399; }
 
 /* 标签卡片：按类型 @page 设纸张尺寸；屏幕预览时按比例缩放展示 */
-/* 字号回退原 px 值（mm 撑满致内容溢出丢失，回退）；顶部大字(扇/套) 22px→18px 缩小 */
+/* 字号回退原 px 值（mm 撑满致内容溢出丢失，回退）；顶部大字(扇/套) 再缩 18px→16px；全表去加粗 */
 .label-sheet {
   width: var(--lw); height: var(--lh);
   background:#fff; color:#000;
@@ -124,14 +124,14 @@ onMounted(async () => {
   display:flex; flex-direction:column; font-size:9px; line-height:1.3;
 }
 
-/* 大字（扇/套）：顶部居中醒目，原 22px 缩小至 18px */
-.big-char { font-size:18px; font-weight:700; text-align:center; letter-spacing:2px; border-bottom:1px solid #000; padding-bottom:1mm; margin-bottom:1mm; }
+/* 大字（扇/套）：顶部居中，18px→16px 再小一号；去加粗 */
+.big-char { font-size:16px; font-weight:400; text-align:center; letter-spacing:2px; border-bottom:1px solid #000; padding-bottom:1mm; margin-bottom:1mm; }
 
-/* 字段表：label 列窄 + val 列宽，无边框靠间距区分（简约工业标签风） */
+/* 字段表：label 列窄 + val 列宽，无边框靠间距区分；val 去加粗 */
 .label-table { width:100%; border-collapse:collapse; flex:1; }
 .label-table td { border:none; padding:0.4mm 0; vertical-align:top; }
 .label-table td.lbl { width:26%; color:#555; white-space:nowrap; }
-.label-table td.val { font-weight:600; word-break:break-all; }
+.label-table td.val { font-weight:400; word-break:break-all; }
 
 .label-foot { margin-top:1mm; border-top:1px solid #999; padding-top:0.5mm; font-size:7px; color:#555; text-align:center; }
 
