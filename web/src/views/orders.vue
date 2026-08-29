@@ -687,6 +687,12 @@
         <span v-if="selectedRows.length === 0" style="color:#909399;font-size:13px">未选中行 → 导出当前页全部（{{ list.length }} 条）</span>
       </div>
       <div class="export-tip">拖动 = 调整列顺序 · 勾选 = 是否导出 · 表头可重命名</div>
+      <div class="export-fname">
+        <span class="fname-label">文件名</span>
+        <el-input v-model="exportFileName" size="small" placeholder="orders-20260829" class="fname-input">
+          <template #append>.xlsx</template>
+        </el-input>
+      </div>
       <div class="export-list">
         <div
           v-for="(c, idx) in exportCols"
@@ -802,6 +808,7 @@ function onSizeChange() {
 const exportVisible = ref(false)
 const exportCols = ref([])      // [{ prop, label, name, checked }]，默认对齐当前显示列
 const exportOnlySelected = ref(false)
+const exportFileName = ref('')  // 导出文件名（默认 orders-YYYYMMDD.xlsx，用户可改）
 const exportRowCount = computed(() => (exportOnlySelected.value && selectedRows.value.length ? selectedRows.value.length : list.value.length))
 
 // 取值函数：复刻表格 v-for 各列分支（尺寸取整/门扇/标签逗号串/欠款/账龄/日期/兜底），
@@ -851,6 +858,10 @@ function openExport() {
     .filter(Boolean)
     .map((c) => ({ prop: c.prop, label: c.label, name: EXPORT_HEADER_NAMES[c.prop] || c.label, checked: EXPORT_DEFAULT_PROPS.includes(c.prop) }))
   exportOnlySelected.value = selectedRows.value.length > 0
+  // 默认文件名 orders-YYYYMMDD.xlsx，用户可在弹窗内改
+  const d = new Date()
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  exportFileName.value = `orders-${stamp}`
   exportVisible.value = true
 }
 
@@ -883,9 +894,10 @@ function doExport() {
   const ws = XLSX.utils.aoa_to_sheet([header, ...data])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '订单')
-  const d = new Date()
-  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  XLSX.writeFile(wb, `orders-${stamp}.xlsx`)
+  // 文件名用弹窗输入值，去空格；无 .xlsx 后缀则补上
+  const raw = (exportFileName.value || 'orders').trim()
+  const fname = /\.xlsx$/i.test(raw) ? raw : `${raw}.xlsx`
+  XLSX.writeFile(wb, fname)
   ElMessage.success(`已导出 ${src.length} 条订单`)
   exportVisible.value = false
 }
@@ -1670,4 +1682,7 @@ onUnmounted(() => {
 .export-row .col-idx { width:22px; height:22px; line-height:22px; text-align:center; background:#f0f2f5; border-radius:50%; font-size:12px; color:#909399; flex-shrink:0; }
 .export-row .export-label { width:150px; flex-shrink:0; font-size:13px; }
 .export-row .export-name { flex:1; }
+.export-fname { display:flex; align-items:center; gap:10px; margin:10px 0; padding:8px 10px; background:#f5f7fa; border-radius:6px; }
+.export-fname .fname-label { font-size:13px; color:#606266; flex-shrink:0; }
+.export-fname .fname-input { flex:1; }
 </style>
