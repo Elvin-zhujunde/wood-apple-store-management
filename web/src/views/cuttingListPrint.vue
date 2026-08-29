@@ -158,7 +158,9 @@ const PAGE_STYLE_ID = 'print-page-orient'
 function applyPageStyle() {
   let el = document.getElementById(PAGE_STYLE_ID)
   if (!el) { el = document.createElement('style'); el.id = PAGE_STYLE_ID; document.head.appendChild(el) }
-  el.textContent = `@page { size: A4 ${orientation.value}; margin: 0; }`  // margin:0 关浏览器页眉页脚(URL/页码/日期无渲染区)，内容边距改由 .cut-sheet padding 提供
+  // 屏幕预览同步纸张方向：横向 297mm 宽 / 纵向 210mm 宽；@page 控打印；@media screen 仅作用于预览不干扰 print
+  const W = orientation.value === 'landscape' ? '297mm' : '210mm'
+  el.textContent = `@page { size: A4 ${orientation.value}; margin: 0; } @media screen { .cut-sheet { width: ${W}; } }`
 }
 watch(orientation, applyPageStyle)
 onUnmounted(() => {
