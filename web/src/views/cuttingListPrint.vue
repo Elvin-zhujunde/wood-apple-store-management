@@ -69,7 +69,7 @@ const headHtml = `
     <th>套板线条</th>
     <th>订单备注</th>
     <th>加工备注</th>
-    <th>原始尺寸(mm)<br>高*宽</th>
+    <th>门面尺寸(mm)<br>高*宽</th>
     <th>板材</th>
   </tr>`
 
@@ -127,7 +127,7 @@ function doPrint() {
 // 导出 Excel：复刻打印表 10 列取值逻辑（取整/null→'-'/标签【】），与页面一致
 function doExportExcel() {
   if (!list.value.length) { ElMessage.warning('没有可导出的数据'); return }
-  const header = ['客户名称', '订单号', '门洞(mm) 高*宽*墙厚', '款式', '颜色', '套板线条', '订单备注', '加工备注', '原始尺寸(mm) 高*宽', '板材']
+  const header = ['客户名称', '订单号', '门洞(mm) 高*宽*墙厚', '款式', '颜色', '套板线条', '订单备注', '加工备注', '门面尺寸(mm) 高*宽', '板材']
   const cells = (v) => (v != null && v !== '' ? v : '-')
   const data = list.value.map((row) => {
     const tags = parseTags(row.remark_tags)
@@ -197,13 +197,13 @@ onMounted(async () => {
 /* 表格：连续紧凑排版，page-break 自动分页（一页多单/多行，省纸） */
 .cut-sheet { width:210mm; margin:0 auto 12px; background:#fff; padding:8mm 8mm; box-sizing:border-box; box-shadow:0 1px 6px rgba(0,0,0,.12); }
 .cut-sheet.single { min-height:auto; }
-.sheet-title { font-size:14px; font-weight:700; letter-spacing:1px; margin-bottom:6px; border-bottom:2px solid #000; padding-bottom:4px; }
+.sheet-title { font-size:17px; font-weight:700; letter-spacing:1px; margin-bottom:6px; border-bottom:2px solid #000; padding-bottom:4px; }
 
-/* 纯黑白表格：横向一页放 1 表头+10 行数据，cell 适度收紧 */
-.cut-table { width:100%; border-collapse:collapse; font-size:13px; color:#000; }
-.cut-table th, .cut-table td { border:1px solid #000; padding:5px 7px; text-align:center; vertical-align:middle; line-height:1.35; }
+/* 纯黑白表格：字号放大优先（cell 适度放大），横向一页约 1 表头+8 行 */
+.cut-table { width:100%; border-collapse:collapse; font-size:16px; color:#000; }
+.cut-table th, .cut-table td { border:1px solid #000; padding:7px 9px; text-align:center; vertical-align:middle; line-height:1.4; }
 .cut-table th { background:#eee; font-weight:600; }
-.cut-table td.door { font-size:15px; }
+.cut-table td.door { font-size:20px; }
 .cut-table .tag-item { display:inline-block; margin:1px 3px; padding:0 3px; white-space:nowrap; }
 
 /* 表底小字汇总行 */
@@ -215,7 +215,7 @@ onMounted(async () => {
   /* @page 由 JS 动态注入（A4 横/纵向可选），见 applyPageStyle */
   .cut-sheet { width:auto; min-height:auto; margin:0 0 4mm; padding:6mm 8mm; box-shadow:none; }  /* @page margin:0 后边距自给；多页中间页上下贴边=表格满版省纸 */
   .cut-sheet:last-child { margin-bottom:0; }
-  .cut-table { font-size:13px; }
+  .cut-table { font-size:16px; }
   .cut-table thead { display:table-header-group; } /* 表头每页重复 */
   .cut-table tr { page-break-inside:avoid; }        /* 行不跨页 */
   .cut-sheet.single { page-break-inside:avoid; }    /* 单张：一单不被截断（整单紧凑不跨页） */
