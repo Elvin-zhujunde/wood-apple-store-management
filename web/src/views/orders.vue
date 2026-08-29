@@ -822,9 +822,15 @@ function getCell(row, prop) {
   return (row[prop] != null && row[prop] !== '') ? row[prop] : '-'
 }
 
+// 导出默认勾选的列（主人指定：客户/订单号/门洞尺寸/门扇尺寸/颜色/款式/备注/子客户/锁孔）
+const EXPORT_DEFAULT_PROPS = ['customer', 'order_no', 'size', 'cut_door', 'color', 'style', 'remark', 'sub_customer', 'lock_hole']
+
 function openExport() {
-  // 默认勾选当前显示列（顺序按 orderedVisibleCols）
-  exportCols.value = orderedVisibleCols.value.map((c) => ({ prop: c.prop, label: c.label, name: c.label, checked: true }))
+  // 列出全部列供勾选，默认仅勾选 EXPORT_DEFAULT_PROPS，其余不勾
+  exportCols.value = colOrder.value
+    .map((p) => allColumns.find((c) => c.prop === p))
+    .filter(Boolean)
+    .map((c) => ({ prop: c.prop, label: c.label, name: c.label, checked: EXPORT_DEFAULT_PROPS.includes(c.prop) }))
   exportOnlySelected.value = selectedRows.value.length > 0
   exportVisible.value = true
 }
