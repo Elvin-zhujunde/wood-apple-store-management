@@ -91,8 +91,8 @@ function rowHtml(row) {
   const doorText = doorParts.some((p) => p !== null) ? doorParts.map((p) => (p === null ? '-' : p)).join('*') : '-'
   return `
     ${cell(row.customer)}
-    ${cell(row.order_no)}
-    <td>${holeText}</td>
+    <td class="orderno">${row.order_no != null && row.order_no !== '' ? row.order_no : '-'}</td>
+    <td class="hole">${holeText}</td>
     ${cell(row.style)}
     ${cell(row.color)}
     ${cell(row.frame_line)}
@@ -204,6 +204,8 @@ onMounted(async () => {
 .cut-table th, .cut-table td { border:1px solid #000; padding:7px 9px; text-align:center; vertical-align:middle; line-height:1.4; }
 .cut-table th { background:#eee; font-weight:600; }
 .cut-table td.door { font-size:20px; }
+.cut-table td.hole { font-size:18px; font-weight:700; }
+.cut-table td.orderno { font-size:18px; font-weight:700; }
 .cut-table .tag-item { display:inline-block; margin:1px 3px; padding:0 3px; white-space:nowrap; }
 
 /* 表底小字汇总行 */
