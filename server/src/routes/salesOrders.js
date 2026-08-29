@@ -253,22 +253,22 @@ router.post(
     if (!customer || !door_bom_id || !color || !qty || !handler_sale || !order_date)
       return fail(res, '客户/门型/颜色/数量/经手人/下单日期 必填');
 
-    // 订单号规则：YYMMDD-N，N 为当月内递增序号（按月累计，每月从1起；非按日）
-    // 查当月(YYMM前缀)已有最大序号+1；旧 SO-YYYYMMDD-NNN 格式不以 YYMM 开头不会被匹配
+    // 订单号规则：YYYYMMDD-NN，NN 为当月内递增序号（按月累计，每月从01起；非按日）
+    // 查当月(YYYYMM前缀)已有最大序号+1；旧 SO-YYYYMMDD-NNN / 2位年格式不以 YYYYMM 开头不会被匹配
     const _t = new Date();
-    const yy = String(_t.getFullYear()).slice(-2);
+    const yyyy = String(_t.getFullYear());
     const mm = String(_t.getMonth() + 1).padStart(2, '0');
     const dd = String(_t.getDate()).padStart(2, '0');
     const [seqRows] = await pool.query(
       'SELECT order_no FROM sales_orders WHERE order_no LIKE ? ORDER BY id DESC LIMIT 1',
-      [`${yy}${mm}%`]
+      [`${yyyy}${mm}%`]
     );
     let seq = 1;
     if (seqRows.length) {
       const m = String(seqRows[0].order_no).match(/-(\d+)$/);
       if (m) seq = parseInt(m[1], 10) + 1;
     }
-    const order_no = `${yy}${mm}${dd}-${seq}`;
+    const order_no = `${yyyy}${mm}${dd}-${String(seq).padStart(2, '0')}`;
     // 单价非必填(免费送可为0/空),后端兜底归一为数字(DB列NOT NULL,空落0)
     const total_amount = qty * (Number(unit_price) || 0);
 
