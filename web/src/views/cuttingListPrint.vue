@@ -10,6 +10,7 @@
         </el-radio-group>
         <el-button @click="goBack">返回</el-button>
         <el-button type="primary" :disabled="!list.length" @click="doPrint">打印</el-button>
+        <el-button type="success" :disabled="!list.length" @click="doExportExcel">导出Excel</el-button>
       </div>
     </div>
 
@@ -38,6 +39,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { cuttingApi } from '../api'
 import { fmtDate } from '../utils/date'
 import { ElMessage } from 'element-plus'
+import * as XLSX from 'xlsx'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,6 +122,34 @@ function goBack() {
 }
 function doPrint() {
   window.print()
+}
+
+// 导出 Excel：复刻打印表 10 列取值逻辑（取整/null→'-'/标签【】），与页面一致
+function doExportExcel() {
+  if (!list.value.length) { ElMessage.warning('没有可导出的数据'); return }
+  const header = ['客户名称', '订单号', '门洞(mm) 高*宽*墙厚', '款式', '颜色', '套板线条', '订单备注', '加工备注', '原始尺寸(mm) 高*宽', '板材']
+  const cells = (v) => (v != null && v !== '' ? v : '-')
+  const data = list.value.map((row) => {
+    const tags = parseTags(row.remark_tags)
+    const tagText = tags.length ? tags.map((t) => '【' + t + '】').join(' ') : '-'
+    const remark = (row.remark || '').trim() || '-'
+    const wall = row.wall_thick != null ? row.wall_thick : (row.wall_thickness != null ? row.wall_thickness : null)
+    const holeParts = [mmInt(row.hole_height), mmInt(row.hole_width), mmInt(wall)]
+    const holeText = holeParts.some((p) => p !== null) ? holeParts.map((p) => (p === null ? '-' : p)).join('*') : '-'
+    const doorParts = [mmInt(row.door_height), mmInt(row.door_width)]
+    const doorText = doorParts.some((p) => p !== null) ? doorParts.map((p) => (p === null ? '-' : p)).join('*') : '-'
+    return [
+      cells(row.customer), cells(row.order_no), holeText, cells(row.style), cells(row.color),
+      cells(row.frame_line), remark, tagText, doorText, cells(row.board),
+    ]
+  })
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data])
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '下料单')
+  const d = new Date()
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  XLSX.writeFile(wb, `cutting-list-${stamp}.xlsx`)
+  ElMessage.success(`已导出 ${list.value.length} 条下料单`)
 }
 
 // A4 横纵向：动态注入 @page（at-rule 不能挂类选择器，须全局单条注入；切换即生效，打印前选好）
