@@ -195,17 +195,17 @@ onMounted(async () => {
 /* 表格：连续紧凑排版，page-break 自动分页（一页多单/多行，省纸） */
 .cut-sheet { width:210mm; margin:0 auto 12px; background:#fff; padding:8mm 8mm; box-sizing:border-box; box-shadow:0 1px 6px rgba(0,0,0,.12); }
 .cut-sheet.single { min-height:auto; }
-.sheet-title { font-size:14px; font-weight:700; letter-spacing:1px; margin-bottom:6px; border-bottom:2px solid #000; padding-bottom:4px; }
+.sheet-title { font-size:16px; font-weight:700; letter-spacing:1px; margin-bottom:8px; border-bottom:2px solid #000; padding-bottom:6px; }
 
-/* 纯黑白表格：黑边框、表头浅灰底、门扇高/宽加粗（无彩色） */
-.cut-table { width:100%; border-collapse:collapse; font-size:12px; color:#000; }
-.cut-table th, .cut-table td { border:1px solid #000; padding:3px 4px; text-align:center; vertical-align:middle; line-height:1.3; }
+/* 纯黑白表格：黑边框、表头浅灰底、门扇高/宽加粗（无彩色）；cell 放大+字号增大 */
+.cut-table { width:100%; border-collapse:collapse; font-size:14px; color:#000; }
+.cut-table th, .cut-table td { border:1px solid #000; padding:7px 9px; text-align:center; vertical-align:middle; line-height:1.4; }
 .cut-table th { background:#eee; font-weight:600; }
-.cut-table td.door { font-size:13px; }
-.cut-table .tag-item { display:inline-block; margin:1px 3px; padding:0 3px; white-space:nowrap; }
+.cut-table td.door { font-size:15px; }
+.cut-table .tag-item { display:inline-block; margin:2px 4px; padding:0 4px; white-space:nowrap; }
 
 /* 表底小字汇总行 */
-.sheet-foot { margin-top:6px; padding-top:4px; border-top:1px solid #999; font-size:11px; color:#333; }
+.sheet-foot { margin-top:8px; padding-top:6px; border-top:1px solid #999; font-size:12px; color:#333; }
 
 @media print {
   .no-print { display:none !important; }
@@ -213,7 +213,7 @@ onMounted(async () => {
   /* @page 由 JS 动态注入（A4 横/纵向可选），见 applyPageStyle */
   .cut-sheet { width:auto; min-height:auto; margin:0 0 4mm; padding:6mm 8mm; box-shadow:none; }  /* @page margin:0 后边距自给；多页中间页上下贴边=表格满版省纸 */
   .cut-sheet:last-child { margin-bottom:0; }
-  .cut-table { font-size:11px; }
+  .cut-table { font-size:13px; }
   .cut-table thead { display:table-header-group; } /* 表头每页重复 */
   .cut-table tr { page-break-inside:avoid; }        /* 行不跨页 */
   .cut-sheet.single { page-break-inside:avoid; }    /* 单张：一单不被截断（整单紧凑不跨页） */
