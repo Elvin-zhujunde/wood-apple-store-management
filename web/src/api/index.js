@@ -38,6 +38,18 @@ export const orderApi = {
   batchPay: (data) => request.put('/sales-orders/batch/pay', data),
   batchUpdate: (data) => request.put('/sales-orders/batch/update', data),
   lockHoles: () => request.get('/sales-orders/lock-holes'),
+  // 全量备份导出 CSV（boss only，含已删订单，DB 原始列名）
+  // 用 fetch 绕过响应拦截器（拦截器按 JSON code 处理，blob 会被误拒）
+  exportAllBackup: async () => {
+    const resp = await fetch('/api/sales-orders/export-all', {
+      headers: { Authorization: 'Bearer ' + localStorage.getItem('token') },
+    });
+    if (!resp.ok) throw new Error(String(resp.status));
+    const blob = await resp.blob();
+    const cd = resp.headers.get('content-disposition') || '';
+    const m = cd.match(/filename="([^"]+)"/);
+    return { blob, filename: m ? m[1] : 'orders-backup.csv' };
+  },
 }
 
 // 采购入库

@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../db/pool');
 const { ok, fail, wrap, genDocNo } = require('../utils/helpers');
-const { auth } = require('../middlewares/auth');
+const { auth, requireRole } = require('../middlewares/auth');
 
 const router = express.Router();
 router.use(auth);
@@ -191,6 +191,34 @@ router.put(
     if (fieldResult) msgs.push(`${fieldResult.success} 单台账字段已更新`);
     if (statusResult) msgs.push(`状态：${statusResult.success} 单前向流转${statusResult.skipped ? `，${statusResult.skipped} 单已为目标或更靠后，跳过` : ''}`);
     ok(res, { fieldResult, statusResult }, `批量编辑完成：${msgs.join('；')}`);
+  })
+);
+
+// 全量备份导出 CSV（boss only，含已删订单，DB 原始列名，用于数据备份）
+router.get(
+  '/export-all',
+  requireRole('boss'),
+  wrap(async (req, res) => {
+    // 列名取 INFORMATION_SCHEMA 保证顺序与表定义一致（空表也安全）
+    const [cols] = await pool.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_orders' ORDER BY ORDINAL_POSITION"
+    );
+    const headers = cols.map((c) => c.COLUMN_NAME);
+    const [rows] = await pool.query('SELECT * FROM sales_orders ORDER BY id');
+    const esc = (v) => {
+      if (v == null) return '';
+      const s = String(v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [headers.map(esc).join(',')];
+    for (const row of rows) lines.push(headers.map((h) => esc(row[h])).join(','));
+    // UTF-8 BOM 防中文乱码
+    const csv = '﻿' + lines.join('\r\n');
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-backup-${stamp}.csv"`);
+    res.send(csv);
   })
 );
 

@@ -29,6 +29,7 @@
       <el-button type="primary" :disabled="batchCuttableCount === 0" @click="openBatchCut">批量下料 ({{ batchCuttableCount }})</el-button>
       <el-button type="info" :disabled="selectedRows.length < 2" @click="openBatchReq">批量领料 ({{ selectedRows.length }})</el-button>
       <el-button type="success" :disabled="!list.length" @click="openExport">导出Excel</el-button>
+      <el-button type="primary" :loading="backupLoading" @click="onBackupExport">备份导出</el-button>
       <ColumnSettings :columns="allColumns" storage-key="orders-cols" @change="onColsChange" />
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
@@ -883,6 +884,26 @@ function onExpDrop(idx) {
   expDragOverIdx.value = -1
 }
 function onExpDragEnd() { expDragIdx.value = -1; expDragOverIdx.value = -1 }
+
+// 全量备份导出 CSV（boss only，含已删订单，DB 原始列名，用于数据备份）
+const backupLoading = ref(false)
+async function onBackupExport() {
+  backupLoading.value = true
+  try {
+    const { blob, filename } = await orderApi.exportAllBackup()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('已导出全量备份 CSV')
+  } catch (e) {
+    ElMessage.error('备份导出失败（需 boss 权限）')
+  } finally {
+    backupLoading.value = false
+  }
+}
 
 function doExport() {
   const cols = exportCols.value.filter((c) => c.checked)
