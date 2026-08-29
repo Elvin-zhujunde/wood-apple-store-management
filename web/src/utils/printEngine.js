@@ -43,12 +43,13 @@ export const LABEL_TYPES = {
 }
 
 // 门洞尺寸取值：door-in/door-out = 高×宽；frame/frame-in = 高×宽×墙厚
+// DB 为 DECIMAL(8,2) 带小数（2130.00），标签展示取整去小数点
 function holeStr(row, withThick) {
-  const h = row.hole_height ?? row.door_h
-  const w = row.hole_width ?? row.door_w
-  const t = row.wall_thick ?? row.wall_thickness
-  let s = `${h ?? '-'}×${w ?? '-'}`
-  if (withThick) s += `×${t ?? '-'}`
+  const num = (v) => (v == null || v === '' ? '-' : Math.round(Number(v)))
+  const h = num(row.hole_height ?? row.door_h)
+  const w = num(row.hole_width ?? row.door_w)
+  let s = `${h}×${w}`
+  if (withThick) s += `×${num(row.wall_thick ?? row.wall_thickness)}`
   return s
 }
 
