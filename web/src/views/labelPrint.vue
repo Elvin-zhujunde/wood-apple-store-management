@@ -8,6 +8,7 @@
       <div>
         <el-button @click="goBack">返回</el-button>
         <el-button type="primary" :disabled="!list.length" @click="doPrint">打印</el-button>
+        <el-button type="success" :disabled="!list.length" @click="exportPdf">导出PDF</el-button>
       </div>
     </div>
 
@@ -35,6 +36,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 import { orderApi } from '../api'
 import { LABEL_TYPES, LABEL_FIELD_MAP, print } from '../utils/printEngine'
 import { ElMessage } from 'element-plus'
@@ -59,6 +62,31 @@ function goBack() {
 }
 function doPrint() {
   print() // 抽象层：当前 A=window.print，日后可切 B
+}
+
+// 导出 PDF：每张标签一页，页面尺寸=标签物理尺寸(mm)。
+// 复用已渲染的 .label-sheet DOM（中文系统字体免嵌字体），html2canvas scale:2 提清晰。
+// 打印 PDF 时选"实际尺寸 100%"即匹配标签纸，解决浏览器直印小尺寸自定义纸偏小的问题。
+async function exportPdf() {
+  if (!list.value.length) return
+  const exporting = ElMessage.info('正在生成 PDF…', 0)
+  try {
+    const s = def.value.size
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [s.w, s.h] })
+    const sheets = document.querySelectorAll('.label-sheet')
+    for (let i = 0; i < sheets.length; i++) {
+      const canvas = await html2canvas(sheets[i], { scale: 2, useCORS: true, backgroundColor: '#fff' })
+      const img = canvas.toDataURL('image/png')
+      if (i > 0) doc.addPage([s.w, s.h])
+      doc.addImage(img, 'PNG', 0, 0, s.w, s.h)
+    }
+    const d = new Date()
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+    doc.save(`labels-${type.value}-${stamp}.pdf`)
+    ElMessage.success(`已导出 ${sheets.length} 张标签 PDF`)
+  } finally {
+    exporting.close()
+  }
 }
 
 onMounted(async () => {
@@ -87,30 +115,31 @@ onMounted(async () => {
 .state-tip { max-width:200mm; margin:40px auto; text-align:center; color:#909399; }
 
 /* 标签卡片：按类型 @page 设纸张尺寸；屏幕预览时按比例缩放展示 */
+/* 字号用 mm 物理单位按纸型撑满（原 9px≈2.4mm 印出来偏小，改 mm 放大直控物理尺寸） */
 .label-sheet {
   width: var(--lw); height: var(--lh);
   background:#fff; color:#000;
   box-sizing:border-box; box-shadow:0 1px 6px rgba(0,0,0,.12);
   margin:0 auto 10px; padding:2mm;
-  display:flex; flex-direction:column; font-size:9px; line-height:1.3;
+  display:flex; flex-direction:column; font-size:var(--fs); line-height:1.4;
 }
 
 /* 大字（扇/套）：顶部居中醒目 */
-.big-char { font-size:22px; font-weight:700; text-align:center; letter-spacing:2px; border-bottom:1px solid #000; padding-bottom:1mm; margin-bottom:1mm; }
+.big-char { font-size:var(--fb); font-weight:700; text-align:center; letter-spacing:2px; border-bottom:1px solid #000; padding-bottom:1mm; margin-bottom:1mm; }
 
 /* 字段表：label 列窄 + val 列宽，无边框靠间距区分（简约工业标签风） */
 .label-table { width:100%; border-collapse:collapse; flex:1; }
-.label-table td { border:none; padding:0.4mm 0; vertical-align:top; }
-.label-table td.lbl { width:26%; color:#555; white-space:nowrap; }
+.label-table td { border:none; padding:0.5mm 0; vertical-align:top; }
+.label-table td.lbl { width:28%; color:#555; white-space:nowrap; }
 .label-table td.val { font-weight:600; word-break:break-all; }
 
-.label-foot { margin-top:1mm; border-top:1px solid #999; padding-top:0.5mm; font-size:7px; color:#555; text-align:center; }
+.label-foot { margin-top:1mm; border-top:1px solid #999; padding-top:0.5mm; font-size:var(--ff); color:#555; text-align:center; }
 
-/* 各类型纸张尺寸（mm→屏幕用 3.78px/mm 近似预览，打印由 @page 精确控制） */
-.lt-door-in  { --lw:151px; --lh:189px; }   /* 40×50 */
-.lt-door-out { --lw:151px; --lh:302px; }   /* 40×80 */
-.lt-frame    { --lw:151px; --lh:302px; }   /* 40×80 */
-.lt-frame-in { --lw:151px; --lh:113px; }   /* 40×30 */
+/* 各类型纸张尺寸(mm→屏幕3.78px/mm预览,打印@page精确) + 字号mm撑满 */
+.lt-door-in  { --lw:151px; --lh:189px; --fs:3.5mm; --fb:9mm; --ff:2mm; }  /* 40×50 */
+.lt-door-out { --lw:151px; --lh:302px; --fs:3.5mm; --fb:9mm; --ff:2mm; }  /* 40×80 */
+.lt-frame    { --lw:151px; --lh:302px; --fs:3.5mm; --fb:9mm; --ff:2mm; }  /* 40×80 */
+.lt-frame-in { --lw:151px; --lh:113px; --fs:3.2mm; --fb:0;   --ff:2mm; }  /* 40×30 无大字 */
 
 @media print {
   .no-print { display:none !important; }
