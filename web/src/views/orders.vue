@@ -28,6 +28,7 @@
       <el-button type="success" :disabled="selectedRows.length === 0" @click="openBatchLabel">标签打印 ({{ selectedRows.length }})</el-button>
       <el-button type="primary" :disabled="batchCuttableCount === 0" @click="openBatchCut">批量下料 ({{ batchCuttableCount }})</el-button>
       <el-button type="info" :disabled="selectedRows.length < 2" @click="openBatchReq">批量领料 ({{ selectedRows.length }})</el-button>
+      <el-button type="success" :disabled="!list.length" @click="openExport">导出Excel</el-button>
       <ColumnSettings :columns="allColumns" storage-key="orders-cols" @change="onColsChange" />
     </div>
     <el-table ref="tableRef" :data="list" stripe border :height="tableHeight" @selection-change="onSelectionChange" @row-click="onRowClick" @select="onSelect">
@@ -678,6 +679,27 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 导出 Excel：勾选列 + 重命名表头 + 仅选中行开关 -->
+    <el-dialog v-model="exportVisible" title="导出 Excel" width="600px" draggable>
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <el-checkbox v-model="exportOnlySelected" :disabled="selectedRows.length === 0">仅导出选中行（{{ selectedRows.length }} 条）</el-checkbox>
+        <span v-if="selectedRows.length === 0" style="color:#909399;font-size:13px">未选中行 → 导出当前页全部（{{ list.length }} 条）</span>
+      </div>
+      <el-table :data="exportCols" border size="small" max-height="420">
+        <el-table-column label="勾选" width="64" align="center">
+          <template #default="{ row }"><el-checkbox v-model="row.checked" /></template>
+        </el-table-column>
+        <el-table-column label="字段" prop="label" width="180" />
+        <el-table-column label="Excel 表头（可重命名）">
+          <template #default="{ row }"><el-input v-model="row.name" size="small" /></template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="exportVisible = false">取消</el-button>
+        <el-button type="primary" @click="doExport">导出（{{ exportRowCount }} 条）</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -686,6 +708,7 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi, bomApi, attachmentApi, cuttingApi, requisitionApi, materialApi, customerApi } from '../api'
 import { fmtDate, todayLocal } from '../utils/date'
+import * as XLSX from 'xlsx'
 
 // 毫米取整：DB 存 DECIMAL(8,2) 带小数，列表/打印展示取整无小数点（DB 照存原值不动）
 function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : '-' }
@@ -761,6 +784,66 @@ function onResize() { tableHeight.value = Math.max(300, window.innerHeight - 280
 function onSizeChange() {
   query.value.page = 1
   load()
+}
+
+// 导出 Excel：列勾选 + 表头重命名 + 仅选中行开关
+const exportVisible = ref(false)
+const exportCols = ref([])      // [{ prop, label, name, checked }]，默认对齐当前显示列
+const exportOnlySelected = ref(false)
+const exportRowCount = computed(() => (exportOnlySelected.value && selectedRows.value.length ? selectedRows.value.length : list.value.length))
+
+// 取值函数：复刻表格 v-for 各列分支（尺寸取整/门扇/标签逗号串/欠款/账龄/日期/兜底），
+// 保证 Excel 内容与页面一致
+function getCell(row, prop) {
+  if (prop === 'size') {
+    return (row.door_h || row.door_w || row.wall_thick)
+      ? `${mmInt(row.door_h)}*${mmInt(row.door_w)}*${mmInt(row.wall_thick)}` : '-'
+  }
+  if (prop === 'cut_door') {
+    return (row.cut_door_height || row.cut_door_width)
+      ? `${mmInt(row.cut_door_height)}×${mmInt(row.cut_door_width)}` : '未下料'
+  }
+  if (prop === 'cut_status') return row.cut_status || '未下料'
+  if (prop === 'cut_remark_tags') {
+    const tags = parseTags(row.cut_remark_tags)
+    return tags.length ? tags.join(',') : '-'
+  }
+  if (prop === 'balance') {
+    const b = balanceOf(row)
+    return b > 0 ? b : (row.paid_amount != null ? 0 : '-')
+  }
+  if (prop === 'status') return row.status || '-'
+  if (prop === 'aging') {
+    const a = agingOf(row)
+    return a != null ? `${a}天` : '-'
+  }
+  const col = allColumns.find((c) => c.prop === prop)
+  if (col && col.date) return row[prop] ? fmtDate(row[prop]) : '-'
+  return (row[prop] != null && row[prop] !== '') ? row[prop] : '-'
+}
+
+function openExport() {
+  // 默认勾选当前显示列（顺序按 orderedVisibleCols）
+  exportCols.value = orderedVisibleCols.value.map((c) => ({ prop: c.prop, label: c.label, name: c.label, checked: true }))
+  exportOnlySelected.value = selectedRows.value.length > 0
+  exportVisible.value = true
+}
+
+function doExport() {
+  const cols = exportCols.value.filter((c) => c.checked)
+  if (!cols.length) { ElMessage.warning('请至少勾选一列'); return }
+  const src = exportOnlySelected.value && selectedRows.value.length ? selectedRows.value : list.value
+  if (!src.length) { ElMessage.warning('没有可导出的数据'); return }
+  const header = cols.map((c) => (c.name || c.label))
+  const data = src.map((row) => cols.map((c) => getCell(row, c.prop)))
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data])
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '订单')
+  const d = new Date()
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  XLSX.writeFile(wb, `orders-${stamp}.xlsx`)
+  ElMessage.success(`已导出 ${src.length} 条订单`)
+  exportVisible.value = false
 }
 
 const dlgVisible = ref(false)
