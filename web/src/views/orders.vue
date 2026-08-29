@@ -680,21 +680,33 @@
       </template>
     </el-dialog>
 
-    <!-- 导出 Excel：勾选列 + 重命名表头 + 仅选中行开关 -->
-    <el-dialog v-model="exportVisible" title="导出 Excel" width="600px" draggable>
-      <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <!-- 导出 Excel：拖拽排序列顺序 + 勾选列 + 重命名表头 + 仅选中行开关 -->
+    <el-dialog v-model="exportVisible" title="导出 Excel" width="620px" draggable>
+      <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <el-checkbox v-model="exportOnlySelected" :disabled="selectedRows.length === 0">仅导出选中行（{{ selectedRows.length }} 条）</el-checkbox>
         <span v-if="selectedRows.length === 0" style="color:#909399;font-size:13px">未选中行 → 导出当前页全部（{{ list.length }} 条）</span>
       </div>
-      <el-table :data="exportCols" border size="small" max-height="420">
-        <el-table-column label="勾选" width="64" align="center">
-          <template #default="{ row }"><el-checkbox v-model="row.checked" /></template>
-        </el-table-column>
-        <el-table-column label="字段" prop="label" width="180" />
-        <el-table-column label="Excel 表头（可重命名）">
-          <template #default="{ row }"><el-input v-model="row.name" size="small" /></template>
-        </el-table-column>
-      </el-table>
+      <div class="export-tip">拖动 = 调整列顺序 · 勾选 = 是否导出 · 表头可重命名</div>
+      <div class="export-list">
+        <div
+          v-for="(c, idx) in exportCols"
+          :key="c.prop"
+          class="export-row"
+          :class="{ dragging: expDragIdx === idx, 'drag-over': expDragOverIdx === idx }"
+          draggable="true"
+          @dragstart="onExpDragStart(idx, $event)"
+          @dragover.prevent="onExpDragOver(idx)"
+          @dragleave="onExpDragLeave(idx)"
+          @drop="onExpDrop(idx)"
+          @dragend="onExpDragEnd"
+        >
+          <el-icon class="drag-handle" title="拖拽排序"><Rank /></el-icon>
+          <span class="col-idx">{{ idx + 1 }}</span>
+          <el-checkbox v-model="c.checked" />
+          <span class="export-label">{{ c.label }}</span>
+          <el-input v-model="c.name" size="small" class="export-name" />
+        </div>
+      </div>
       <template #footer>
         <el-button @click="exportVisible = false">取消</el-button>
         <el-button type="primary" @click="doExport">导出（{{ exportRowCount }} 条）</el-button>
@@ -714,7 +726,7 @@ import * as XLSX from 'xlsx'
 function mmInt(v) { return v != null && v !== '' ? Math.round(Number(v)) : '-' }
 import { tagType } from '../utils/tagColor'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { WarningFilled } from '@element-plus/icons-vue'
+import { WarningFilled, Rank } from '@element-plus/icons-vue'
 import { useUserStore } from '../store/user'
 import ImageUpload from '../components/ImageUpload.vue'
 import TagInput from '../components/TagInput.vue'
@@ -831,15 +843,35 @@ const EXPORT_HEADER_NAMES = {
 }
 
 function openExport() {
-  // 列出全部列供勾选，默认仅勾选 EXPORT_DEFAULT_PROPS，其余不勾；
-  // 表头默认文本：9 列用简短名，其余用原 label
-  exportCols.value = colOrder.value
+  // 列顺序：9 个预选列按主人指定序在前，其余列在后；
+  // 默认仅勾选 EXPORT_DEFAULT_PROPS，表头 9 列用简短名其余原 label
+  const rest = colOrder.value.filter((p) => !EXPORT_DEFAULT_PROPS.includes(p))
+  exportCols.value = [...EXPORT_DEFAULT_PROPS, ...rest]
     .map((p) => allColumns.find((c) => c.prop === p))
     .filter(Boolean)
     .map((c) => ({ prop: c.prop, label: c.label, name: EXPORT_HEADER_NAMES[c.prop] || c.label, checked: EXPORT_DEFAULT_PROPS.includes(c.prop) }))
   exportOnlySelected.value = selectedRows.value.length > 0
   exportVisible.value = true
 }
+
+// 导出弹窗列拖拽排序（HTML5 原生拖拽，复用 ColumnSettings 模式）
+const expDragIdx = ref(-1)
+const expDragOverIdx = ref(-1)
+function onExpDragStart(idx, e) { expDragIdx.value = idx; e.dataTransfer.effectAllowed = 'move' }
+function onExpDragOver(idx) { if (expDragIdx.value !== -1 && expDragIdx.value !== idx) expDragOverIdx.value = idx }
+function onExpDragLeave(idx) { if (expDragOverIdx.value === idx) expDragOverIdx.value = -1 }
+function onExpDrop(idx) {
+  const from = expDragIdx.value
+  const to = idx
+  if (from === -1 || from === to) { expDragIdx.value = -1; expDragOverIdx.value = -1; return }
+  const arr = [...exportCols.value]
+  const [moved] = arr.splice(from, 1)
+  arr.splice(to, 0, moved)
+  exportCols.value = arr
+  expDragIdx.value = -1
+  expDragOverIdx.value = -1
+}
+function onExpDragEnd() { expDragIdx.value = -1; expDragOverIdx.value = -1 }
 
 function doExport() {
   const cols = exportCols.value.filter((c) => c.checked)
@@ -1624,4 +1656,18 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .row-btn { min-height: 44px; padding: 0 12px; }
 }
+</style>
+
+<style>
+/* 导出 Excel 弹窗：可拖拽排序列表（el-dialog teleport 到 body，用非 scoped 生效） */
+.export-tip { font-size:12px; color:#909399; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ebeef5; }
+.export-list { display:flex; flex-direction:column; gap:2px; max-height:420px; overflow-y:auto; }
+.export-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; border:1px solid transparent; cursor:grab; transition:background .12s, border-color .12s; }
+.export-row:hover { background:#f5f7fa; }
+.export-row.dragging { opacity:.4; }
+.export-row.drag-over { background:#ecf5ff; border-color:#409eff; }
+.export-row .drag-handle { color:#c0c4cc; cursor:grab; flex-shrink:0; }
+.export-row .col-idx { width:22px; height:22px; line-height:22px; text-align:center; background:#f0f2f5; border-radius:50%; font-size:12px; color:#909399; flex-shrink:0; }
+.export-row .export-label { width:150px; flex-shrink:0; font-size:13px; }
+.export-row .export-name { flex:1; }
 </style>
