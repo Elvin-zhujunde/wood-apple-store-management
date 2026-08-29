@@ -102,7 +102,7 @@
       v-model:current-page="query.page"
       v-model:page-size="query.pageSize"
       :total="total"
-      :page-sizes="[20, 50, 100, 200]"
+      :page-sizes="[20, 50, 100, 200, 500, 1000]"
       layout="total, sizes, prev, pager, next, jumper"
       style="margin-top:12px"
       @current-change="load"
@@ -700,7 +700,7 @@ import ColumnSettings from '../components/ColumnSettings.vue'
 const store = useUserStore()
 const route = useRoute()
 const router = useRouter()
-const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 50 })
+const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 500 })
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
@@ -1020,7 +1020,7 @@ async function load() {
 }
 
 function resetQuery() {
-  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 50 }
+  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 500 }
   if (route.query.status) query.value.status = String(route.query.status)
   load()
 }
