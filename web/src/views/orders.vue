@@ -741,7 +741,7 @@ import ColumnSettings from '../components/ColumnSettings.vue'
 const store = useUserStore()
 const route = useRoute()
 const router = useRouter()
-const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 500 })
+const query = ref({ order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 100 })
 const list = ref([])
 const total = ref(0)
 const bomList = ref([])
@@ -1159,7 +1159,7 @@ async function load() {
 }
 
 function resetQuery() {
-  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 500 }
+  query.value = { order_no: '', customer: '', door_bom_id: '', handler_sale: '', status: '', cut_status: '', dateRange: [], page: 1, pageSize: 100 }
   if (route.query.status) query.value.status = String(route.query.status)
   load()
 }
