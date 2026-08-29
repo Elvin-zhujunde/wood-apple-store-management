@@ -824,13 +824,19 @@ function getCell(row, prop) {
 
 // 导出默认勾选的列（主人指定：客户/订单号/门洞尺寸/门扇尺寸/颜色/款式/备注/子客户/锁孔）
 const EXPORT_DEFAULT_PROPS = ['customer', 'order_no', 'size', 'cut_door', 'color', 'style', 'remark', 'sub_customer', 'lock_hole']
+// 这 9 列的 Excel 表头默认文本用主人指定的简短名（其余列用原 label）
+const EXPORT_HEADER_NAMES = {
+  customer: '客户', order_no: '订单号', size: '门洞尺寸', cut_door: '门扇尺寸',
+  color: '颜色', style: '款式', remark: '备注', sub_customer: '子客户', lock_hole: '锁孔',
+}
 
 function openExport() {
-  // 列出全部列供勾选，默认仅勾选 EXPORT_DEFAULT_PROPS，其余不勾
+  // 列出全部列供勾选，默认仅勾选 EXPORT_DEFAULT_PROPS，其余不勾；
+  // 表头默认文本：9 列用简短名，其余用原 label
   exportCols.value = colOrder.value
     .map((p) => allColumns.find((c) => c.prop === p))
     .filter(Boolean)
-    .map((c) => ({ prop: c.prop, label: c.label, name: c.label, checked: EXPORT_DEFAULT_PROPS.includes(c.prop) }))
+    .map((c) => ({ prop: c.prop, label: c.label, name: EXPORT_HEADER_NAMES[c.prop] || c.label, checked: EXPORT_DEFAULT_PROPS.includes(c.prop) }))
   exportOnlySelected.value = selectedRows.value.length > 0
   exportVisible.value = true
 }
